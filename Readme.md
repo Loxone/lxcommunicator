@@ -1,13 +1,13 @@
-#LxCommunicator v0.9
+# LxCommunicator v0.9
 This module exposes all necessary modules to establish a secure and encrypted connection to a Loxone Miniserver.
 <br>
 LxCommunicator can be installed using **[npm](http://npmjs.com/)** or **[bower](https://bower.io/)**
 
-##Disclaimer
+## Disclaimer
 - Loxone Electronics GmbH doesn't provide any support for this module
 - Please submit an issue or file an pull request if you find any issue
 
-##Support
+## Support
 | Native                              | Supported  |
 |:------------------------------------|:-----------|
 | Node.js                             | [x]        |
@@ -21,8 +21,8 @@ LxCommunicator can be installed using **[npm](http://npmjs.com/)** or **[bower](
 | Edge            | [x]         |
 | IE              | [ ]         |
 
-##Use LxCommunicator
-####Node.js and Browserify
+## Use LxCommunicator
+#### Node.js and Browserify
 *Example:* `./test/index.js`
 
 > **Note for Browserify**<br>Please make sure [Browserify is correctly configured](http://browserify.org/#install)!
@@ -35,7 +35,7 @@ npm install lxcommunicator --save
 var LxCommunicator = require('lxcommunicator');
 ````
 
-####Browser
+#### Browser
 *Example:* `./test/index.html`
 - Add LxCommunicator as a local module
 ```
@@ -48,17 +48,17 @@ npm install lxcommunicator --save
 ```
 - LxCommunicator is exposed as a global object
 
-#Developer Notes
+# Developer Notes
 
-##Example
+## Example
 **Please take a look in the `./test` folder and run `npm test` to run `./test/index.js` in Node.js**
 
-##Create Browser module
+## Create Browser module
 - Execute the `browserify.js` script, it will create the browser modules
 ````
 node ./browserify.js
 ````
 
-##Set Debug flags
+## Set Debug flags
 Go to `./vendor/Debug.js` and adopt the flags to your needs.<br>
 > **Note:**<br>Don't forget to execute the browserify script everytime you make a change in this module!
