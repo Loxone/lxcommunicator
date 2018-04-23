@@ -69,3 +69,5 @@ typings/
 
 # IntelliJ project files
 gen
+/LxCommunicator~Browser.js
+/LxCommunicator~Browser.min.js
