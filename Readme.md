@@ -1,7 +1,7 @@
 # LxCommunicator v0.9
 This module exposes all necessary modules to establish a secure and encrypted connection to a Loxone Miniserver.
 <br>
-LxCommunicator can be installed using **[npm](http://npmjs.com/)** or **[bower](https://bower.io/)**
+LxCommunicator can be installed using **[npm](http://npmjs.com/)** (``npm i lxcommunicator``) or **[bower](https://bower.io/)** (``bower install lxcommunicator``)
 
 ## Disclaimer
 - Loxone Electronics GmbH doesn't provide any support for this module
