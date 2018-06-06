@@ -39,7 +39,7 @@
         CryptoJS = require('crypto-js'),
         WebSocketConfig = require('./WebSocketConfig'),
         WebSocketWrapper = require('../vendor/WebSocketWrapper'),
-        HttpReqest = require('./HttpRequest'),
+        HttpRequest = require('./HttpRequest'),
         TokenHandler = require('./TokenHandler'),
         BinaryEvent = require('./BinaryEvent'),
         SupportCode = require('../vendor/SupportCode'),
@@ -97,7 +97,7 @@
                 resHost = resHost + "/";
             }
 
-            this._httpCom = new HttpReqest();
+            this._httpCom = new HttpRequest();
 
             if (!FeatureCheck.hasCurrentVersion()) {
                 Debug.Socket.Basic && console.info("No Version defined, requesting version for Feature checking");
@@ -1022,19 +1022,47 @@
         return encryptionType;
     };
 
-    var _resolveHost = function(host) {
-        host = host.replace("https://", "");
-        host = host.replace("http://", "");
+    /**
+     * Resolves the external IP address from the Loxone CloudDNS if the URL is an Loxone CloudDNS URL
+     * The given URL is resolved if it isn't a CloudDNS URL
+     * @param url The address the Miniserver can be reached with
+     * @return {Promise}
+     * @private
+     */
+    var _resolveHost = function(url) {
+        var cloudDNSIndex,
+            isOldDNS,
+            isNewDNS,
+            serialNo;
+
+        url = url.replace("https://", "");
+        url = url.replace("http://", "");
         return new Promise(function(resolve, reject) {
-            if (host.indexOf("dns.loxonecloud.com") === 0) {
+            cloudDNSIndex = url.indexOf("dns.loxonecloud.com");
+            isOldDNS = cloudDNSIndex === 0;    // Like dns.loxonecloud.com/{serialNo}
+            isNewDNS = cloudDNSIndex === 13;    // Like {serialNo}.dns.loxonecloud.com
+
+            // Get the serial number out of the url
+            if (isOldDNS) {
+                serialNo = url.slice(20); // Get the serial number, which is located on the end of the url
+            } else if (isNewDNS) {
+                serialNo = url.slice(0, 12); // Ge the serial number, which is located on the beginning of the url
+            }
+
+            if (serialNo) {
                 return $.ajax({
-                    url: "http://dns.loxonecloud.com/?getip&snr=" + host.slice(20) + "&json=true",
+                    url: "http://dns.loxonecloud.com/?getip&snr=" + serialNo + "&json=true",
                     dataType: "json"
                 }).then(function(result) {
-                    resolve(JSON.parse(result).IP);
+                    // Node.js already parses the result, Javascript doesn't
+                    if (typeof result === "object") {
+                        resolve(result.IP);
+                    } else {
+                        resolve(JSON.parse(result).IP);
+                    }
                 }, reject);
             }
-            resolve(host);
+            resolve(url);
         });
     };
 

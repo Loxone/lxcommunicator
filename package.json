@@ -1,6 +1,6 @@
 {
   "name": "lxcommunicator",
-  "version": "0.9.0",
+  "version": "1.0.0",
   "description": "Communicate securily with the Loxone Miniserver via Websocket or HTTP requests",
   "main": "LxCommunicator.js",
   "scripts": {
