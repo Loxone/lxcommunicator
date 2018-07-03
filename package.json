@@ -1,6 +1,6 @@
 {
   "name": "lxcommunicator",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Communicate securily with the Loxone Miniserver via Websocket or HTTP requests",
   "main": "LxCommunicator.js",
   "scripts": {
@@ -25,15 +25,16 @@
   },
   "dependencies": {
     "axios": "^0.17.1",
+    "browserify": "^16.1.0",
     "crypto-js": "^3.1.9-1",
+    "derequire": "^2.0.6",
     "moment": "^2.20.1",
     "node-jsencrypt": "^1.0.0",
+    "object.values": "^1.0.4",
     "q": "^1.5.1",
     "sprintf-js": "^1.1.1",
+    "uglify-js": "^3.3.12",
     "websocket": "^1.0.25",
-    "when": "^3.7.8",
-    "browserify": "^16.1.0",
-    "derequire": "^2.0.6",
-    "uglify-js": "^3.3.12"
+    "when": "^3.7.8"
   }
 }

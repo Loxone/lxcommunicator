@@ -8,7 +8,8 @@
         globalObj = global;
     }
 
-    var Utils = {};
+    var Utils = {},
+        values = require('object.values'); // Shim used for Object.values()
 
     /** Function count the occurrences of substring in a string;
      * @param {String} string   Required. The string;
@@ -199,6 +200,11 @@
             return parseFloat((Math.round(value * a) / a));
         }
     };
+
+    // Object.values has just gained support by the latest Node.js version, use a shim, if Object.values doesn't exist.
+    if (!Object.values) {
+        values.shim();
+    }
 
     //////////////////////////////////////////////////////////////////////
     module.exports = Utils;

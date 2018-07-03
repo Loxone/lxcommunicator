@@ -20,6 +20,10 @@
         var tokenMap = {};
 
         return {
+
+            // Name is ued for debug output
+            name: "TokenHandler",
+
             /**
              * Will try to acquire a token for this user with this password. When the returned promise resolves, it will
              * provide an object containing both the acquired token and a oneTimeSalt.
@@ -326,7 +330,6 @@
                 return this._sendTokenCommand(Commands.TOKEN.REFRESH, token, username).then(function(result) {
                     resObj = getLxResponseValue(result);
                     resObj.seconds = resObj.validUntil;
-                    // TODO-goelzda
                     resObj.validUntil = moment.utc([2009, 0, 1, 0, 0, 0]).add(resObj.seconds, "seconds");
                     return resObj;
                 }, function (err) {
