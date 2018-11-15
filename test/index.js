@@ -19,6 +19,9 @@ var uuid = getUUID(),
         socketOnTokenReceived: function socketOnTokenReceived(socket, result) {
             console.log(result);
         },
+        socketOnTokenRefresh: function socketOnTokenRefresh(socket, newTkObj) {
+            console.log(newTkObj);
+        },
         socketOnConnectionClosed: function socketOnConnectionClosed(socket, code) {
             console.log(code);
         },
