@@ -14,6 +14,7 @@
 
     var Commands = {
         GET_KEY: "jdev/sys/getkey",
+        GET_API_KEY: "jdev/cfg/apiKey",
         AUTHENTICATE: "authenticate/%s",                    // hash user:pw
         STRUCTURE_FILE_DATE: "jdev/sps/LoxAPPversion3",
 
@@ -35,8 +36,9 @@
             AUTHENTICATE: "authwithtoken/%s/%s",            // [hash, user]
             AUTHENTICATE_ID: "authwithtoken/",              // [hash, user] --> to detect the command
             REFRESH: "jdev/sys/refreshtoken/%s/%s",         // [tokenHash, user]
+            CHECK: "jdev/sys/checktoken/%s/%s",             // [tokenHash, user]    // available since 10.0.9.13, successful if the token is valid.
             KILL: "jdev/sys/killtoken/%s/%s",               // [tokenHash, user]
-            AUTH_ARG: "autht=%s&user=%s"                    // [tokenhash, user]
+            AUTH_ARG: "autht=%s&user=%s"                    // [tokenHash, user]
         },
 
         /**
