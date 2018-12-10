@@ -48,7 +48,7 @@
                     hash = this._otHash(user + ":" + pwHash, saltObj.oneTimeSalt);
 
                     // create the getToken cmd
-                    cmd = Commands.format(Commands.TOKEN.GET_TOKEN, hash, user, msPermission, deviceId, deviceInfo);
+                    cmd = Commands.format(this._getGetTokenCommand(), hash, user, msPermission, deviceId, deviceInfo);
                     Debug.Tokens && console.log("   request a token: " + cmd);
 
                     return communicatorModule.send(cmd, EncryptionType.REQUEST_RESPONSE_VAL).then(function(tResult) {
@@ -351,7 +351,7 @@
             _refreshToken: function _refreshToken(tokenObj) {
                 Debug.Tokens && console.log(this.name, "_refreshToken: " + tokenObj.username + " - Perm: " + this._translPerm(tokenObj.msPermission));
 
-                return this._sendTokenCommand(Commands.TOKEN.REFRESH, tokenObj.token, tokenObj.username).then(function(result) {
+                return this._sendTokenCommand(this._getRefreshCommand(), tokenObj.token, tokenObj.username).then(function(result) {
                     return getLxResponseValue(result);
                 }.bind(this), function (err) {
                     console.error("Could not refresh the token of '" + tokenObj.username + "' with permission + " + this._translPerm(tokenObj.msPermission));
@@ -660,6 +660,24 @@
                 }
 
                 return tkObj;
+            },
+
+            /**
+             * Returns the right getToken command, as new Miniservers support a separate command for JWT & legacy tokens
+             * @return {string}
+             * @private
+             */
+            _getGetTokenCommand: function _getGetTokenCommand() {
+                return FeatureCheck.check(FeatureCheck.feature.JWT_SUPPORT) ? Commands.TOKEN.GET_JWT_TOKEN : Commands.TOKEN.GET_TOKEN;
+            },
+
+            /**
+             * Returns the proper refresh command, as new Miniservers support a separate command for JWT & legacy tokens
+             * @return {string}
+             * @private
+             */
+            _getRefreshCommand: function _getRefreshCommand() {
+                return FeatureCheck.check(FeatureCheck.feature.JWT_SUPPORT)  ? Commands.TOKEN.REFRESH : Commands.TOKEN.REFRESH_JWT;
             }
         }
     };
