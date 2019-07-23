@@ -121,7 +121,7 @@
                 var encryptionAllowed = FeatureCheck.check(FeatureCheck.feature.TOKENS),
                     supportsTokens = FeatureCheck.check(FeatureCheck.feature.TOKENS);
 
-                this._hashAlg = FeatureCheck.check(FeatureCheck.feature.SHA_256);
+                this._hashAlg = FeatureCheck.check(FeatureCheck.feature.SHA_256) ? CryptoAdapter.HASH_ALGORITHM.SHA256 : CryptoAdapter.HASH_ALGORITHM.SHA1;
 
                 if (this._ws && this._ws.ws && !this._ws.socketClosed) {
                     console.warn(this.name + "===============================================================");
