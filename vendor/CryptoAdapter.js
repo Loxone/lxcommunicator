@@ -17,7 +17,12 @@
 
     //////////////////////////////////////////////////////////////////////
 
-    var CryptoAdapter = {};
+    var CryptoAdapter = {
+        HASH_ALGORITHM: {
+            SHA1: "SHA1",
+            SHA256: "SHA256"
+        }
+    };
 
     /**
      * Creates a Hmac-SHA1 hash of the provided message
@@ -39,6 +44,28 @@
 
     CryptoAdapter.SHA1 = function SHA1(message) {
         return CryptoJS.SHA1(message).toString();
+    };
+
+    /**
+     * Creates a Hmac-SHA1 hash of the provided message
+     * @param {string} message text which should be hashed
+     * @param {'utf8'|'hex'} messageEncoding encoding of the message
+     * @param key which is used to create the hash
+     * @param {'utf8'|'hex'} keyEncoding encoding of the key
+     * @param {'utf8'|'hex'} hashEncoding encoding of he result
+     * @returns {string|*} resulting hash
+     */
+    CryptoAdapter.HmacSHA256 = function HmacSHA256(message, messageEncoding, key, keyEncoding, hashEncoding) {
+        var msg = getEncoding(messageEncoding).parse(message);
+        var k = getEncoding(keyEncoding).parse(key);
+        var hash = CryptoJS.HmacSHA256(msg, k);
+
+        return hash.toString(getEncoding(hashEncoding || 'utf8'));
+    };
+
+
+    CryptoAdapter.SHA256 = function SHA256(message) {
+        return CryptoJS.SHA256(message).toString();
     };
 
 
