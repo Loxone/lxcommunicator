@@ -14,7 +14,7 @@
         TOKEN_REFRESH_AND_CHECK: "10.0.9.13",       // Tokens may now change when being refreshed. New webservice for checking token validity without changing them introduced
         SECURE_HTTP_REQUESTS: "7.1.9.17",
         JWT_SUPPORT: "10.1.12.5",                   // From this version onwards, JWTs are handled using separate commands to ensure regular apps remain unchanged.
-        SHA_256: "10.3.7.22"
+        SHA_256: "10.4.0.0"
     };
 
     FeatureCheck.setCurrentVersion = function setCurrentVersion(current) {
