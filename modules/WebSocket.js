@@ -71,7 +71,8 @@
             salt: null, // current salt, must alternate with each encrypted command
             key: null,  // AES key for the current session
             iv: null    // AES iv
-        }
+        };
+        this._hashAlg = CryptoAdapter.HASH_ALGORITHM.SHA1;
     }
 
 
@@ -119,6 +120,8 @@
                 }.bind(this));
                 var encryptionAllowed = FeatureCheck.check(FeatureCheck.feature.TOKENS),
                     supportsTokens = FeatureCheck.check(FeatureCheck.feature.TOKENS);
+
+                this._hashAlg = FeatureCheck.check(FeatureCheck.feature.SHA_256);
 
                 if (this._ws && this._ws.ws && !this._ws.socketClosed) {
                     console.warn(this.name + "===============================================================");
@@ -233,7 +236,7 @@
 
     WebSocket.prototype._authenticate = function _authenticate(user, password, oneTimeSalt, encrypted) {
         var creds = user + ":" + password,
-            hash = CryptoAdapter.HmacSHA1(creds, "utf8", oneTimeSalt, "hex", "hex"),
+            hash = CryptoAdapter["Hmac" + this._hashAlg](creds, "utf8", oneTimeSalt, "hex", "hex"),
             cmd;
 
         // starting pw based authentication.
@@ -264,7 +267,7 @@
     };
 
     /**
-     * Will create a HMAC-SHA1 hash based on the token and the oneTimeSalt provided & send it to
+     * Will create a HmacSHA1 or HmacSHA256 hash based on the token and the oneTimeSalt provided & send it to
      * the Miniserver in an authentication request.
      * @param user          the user for which the authentication request is made
      * @param token         the authentication token for this user
@@ -273,7 +276,7 @@
      */
     WebSocket.prototype._authWithToken = function _authWithToken(user, token, permission, oneTimeSalt) {
         Debug.Socket.Basic && console.log("WebSocket", "authenticate with token");
-        var hash = CryptoAdapter.HmacSHA1(token, "utf8", oneTimeSalt, "hex", "hex"),
+        var hash = CryptoAdapter["Hmac" + this._hashAlg](token, "utf8", oneTimeSalt, "hex", "hex"),
             cmd = Commands.format(Commands.TOKEN.AUTHENTICATE, hash, user),
             response;
 
@@ -342,8 +345,8 @@
         var encryptionType = FeatureCheck.check(FeatureCheck.feature.ENCRYPTED_CONNECTION_FULLY) ? EncryptionType.REQUEST_RESPONSE_VAL : EncryptionType.NONE;
         return this.send(Commands.GET_KEY, encryptionType).then(function(res) {
             var oneTimeSalt = getLxResponseValue(res, true);
-            return CryptoAdapter.HmacSHA1(payload, "utf8", oneTimeSalt, "hex", "hex");
-        });
+            return CryptoAdapter["Hmac" + this._hashAlg](payload, "utf8", oneTimeSalt, "hex", "hex");
+        }.bind(this));
     };
 
     /**
