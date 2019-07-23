@@ -101,7 +101,7 @@
 
             if (!FeatureCheck.hasCurrentVersion()) {
                 Debug.Socket.Basic && console.info("No Version defined, requesting version for Feature checking");
-                this._httpCom.requestValue(resHost, "jdev/cfg/apiKey").then(function succ(value) {
+                this._httpCom.requestValue(resHost, Commands.GET_API_KEY).then(function succ(value) {
                     FeatureCheck.setCurrentVersion(value.version);
                     featureDef.resolve();
                 }, function(e) {
@@ -114,7 +114,9 @@
             return featureDef.promise.then(function() {
                 Debug.Socket.Basic && console.log(this.name + "try to open WebSocket to host:", resHost);
 
-                this._tokenHandler = new TokenHandler(this, this._config.uniqueId, this._config.deviceInfo);
+                this._tokenHandler = new TokenHandler(this, this._config.uniqueId, this._config.deviceInfo, function(tkObj) {
+                    this._config.delegate.socketOnTokenRefresh && this._config.delegate.socketOnTokenRefresh(this, tkObj);
+                }.bind(this));
                 var encryptionAllowed = FeatureCheck.check(FeatureCheck.feature.TOKENS),
                     supportsTokens = FeatureCheck.check(FeatureCheck.feature.TOKENS);
 
@@ -231,7 +233,7 @@
 
     WebSocket.prototype._authenticate = function _authenticate(user, password, oneTimeSalt, encrypted) {
         var creds = user + ":" + password,
-            hash = CryptoJS.HmacSHA1(creds, "utf8", oneTimeSalt, "hex", "hex"),
+            hash = CryptoAdapter.HmacSHA1(creds, "utf8", oneTimeSalt, "hex", "hex"),
             cmd;
 
         // starting pw based authentication.
@@ -271,7 +273,7 @@
      */
     WebSocket.prototype._authWithToken = function _authWithToken(user, token, permission, oneTimeSalt) {
         Debug.Socket.Basic && console.log("WebSocket", "authenticate with token");
-        var hash = CryptoJS.HmacSHA1(token, "utf8", oneTimeSalt, "hex", "hex"),
+        var hash = CryptoAdapter.HmacSHA1(token, "utf8", oneTimeSalt, "hex", "hex"),
             cmd = Commands.format(Commands.TOKEN.AUTHENTICATE, hash, user),
             response;
 
@@ -317,6 +319,7 @@
         this._tokenHandler.requestToken(user, password, msPermission).then(function (result) {
             if (result && result.token) {
                 Debug.Socket.Basic && console.log(this.name, "Token received!");
+                this._tokenHandler.addToHandledTokens(result, result.username);
 
                 // emit the new token so it'll be kept alive.
                 this._config.delegate.socketOnTokenReceived && this._config.delegate.socketOnTokenReceived(this, result);
@@ -328,6 +331,19 @@
                 throw new Error("Could not acquire token!");
             }
         }.bind(this), this._handleBadAuthResponse);
+    };
+
+    /**
+     * Will request a oneTimeSalt and return a hashed version of the payload required.
+     * @param payload   the payload to create the onetime hash from.
+     */
+    WebSocket.prototype.getSaltedHash = function getSaltedHash(payload) {
+        // Detect if encryption is supported at all.
+        var encryptionType = FeatureCheck.check(FeatureCheck.feature.ENCRYPTED_CONNECTION_FULLY) ? EncryptionType.REQUEST_RESPONSE_VAL : EncryptionType.NONE;
+        return this.send(Commands.GET_KEY, encryptionType).then(function(res) {
+            var oneTimeSalt = getLxResponseValue(res, true);
+            return CryptoAdapter.HmacSHA1(payload, "utf8", oneTimeSalt, "hex", "hex");
+        });
     };
 
     /**
@@ -1055,10 +1071,10 @@
                     dataType: "json"
                 }).then(function(result) {
                     // Node.js already parses the result, Javascript doesn't
-                    if (typeof result === "object") {
-                        resolve(result.IP);
+                    if (typeof result.data === "object") {
+                        resolve(result.data.IP);
                     } else {
-                        resolve(JSON.parse(result).IP);
+                        resolve(JSON.parse(result.data).IP);
                     }
                 }, reject);
             }

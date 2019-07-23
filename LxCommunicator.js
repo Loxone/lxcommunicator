@@ -34,6 +34,7 @@
      * It also holds the delegate for the WebSocket with the following methods
      * socketOnTokenConfirmed(socket, response)
      * socketOnTokenReceived(socket, result)
+     * socketOnTokenRefresh(socket, result) will be refreshed in Miniserver Version 10.1
      * socketOnConnectionClosed(socket. code)
      * socketOnEventReceived(socket, events, type)
      * socketOnDataProgress(socket, progress) -> Only if the socket is a downloadSocket

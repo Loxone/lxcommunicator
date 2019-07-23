@@ -50,9 +50,9 @@
 
                 DEBUG && console.log("App -> Miniserver: " + cmd);
                 ajax = $.ajax(rq);
-                res = ajax.then(function (resObj) {
-                    DEBUG && console.log("Miniserver -> App: " + JSON.stringify(resObj));
-                    return resObj;
+                res = ajax.then(function (response) {
+                    DEBUG && console.log("Miniserver -> App: " + JSON.stringify(response.data));
+                    return response.data;
                 });
 
                 // ajax.error is only needed and defined in the browser

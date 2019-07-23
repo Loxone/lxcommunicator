@@ -8,7 +8,8 @@
         globalObj = global;
     }
 
-    var Utils = {};
+    var Utils = {},
+        values = require('object.values'); // Shim used for Object.values()
 
     /** Function count the occurrences of substring in a string;
      * @param {String} string   Required. The string;
@@ -178,11 +179,76 @@
     };
 
     /**
+     * updates the obj1 with all properties (recursive) of the obj2
+     * -> use this if you want to keep the object references
+     * 1) !!! NO LONGER VALID: it deletes all properties of obj1 which are not present at obj2
+     * 2) Arrays will be simply replaced (not needed/implemented so far)
+     * @param obj1
+     * @param obj2
+     */
+    globalObj.updateObject = function(obj1, obj2) {
+        var key,
+            val1,
+            val2;
+        // take all props from obj2 and update it on obj1
+        for (key in obj2) {
+            if (obj2.hasOwnProperty(key)) {
+                val1 = obj1[key];
+                val2 = obj2[key];
+                if (typeof val1 === "object" && typeof val2 === "object") {
+                    updateObject(val1, val2);
+                } else if (val1 instanceof Array && val2 instanceof Array) {
+                    console.warn("check if updateObject works correctly (updating Array)");
+                    obj1[key] = val2; // simply use the new array (if it's not enough in future, we have to compare/merge the arrays recursively)
+                } else if (val1 !== val2) {
+                    obj1[key] = val2;
+                }
+            }
+        }
+        // delete properties which are not present in obj2
+        for (key in obj1) {
+            if (obj1.hasOwnProperty(key) && !obj2.hasOwnProperty(key)) {
+                switch (key) {
+                    // these cases can be set to "don't use" eg. in ExpertMode -> we have to delete them anyway
+                    case "room":
+                    case "cat":
+                    case "defaultIcon":
+                    case "statistic":
+                        console.log("deleting " + key);
+                        delete obj1[key];
+                        break;
+                    default:
+                        //console.log("don't delete " + key);
+                        // DON'T DELETE other values! (eg. when updating a control object, we would remove controlType, etc!)
+                        break;
+                }
+            }
+        }
+    };
+
+
+    String.prototype.hasPrefix = function (suffix) {
+        return this.indexOf(suffix) === 0;
+    };
+
+    String.prototype.hasSuffix = function (suffix) {
+        return this.indexOf(suffix, this.length - suffix.length) !== -1;
+    };
+
+    /**
      * If String.prototype.startsWith does not exist String.prototype.hasPrefix will be used
      * String.prototype.startsWith is not available from Android 4.4.2 to 5.1
      */
     if (String.prototype.startsWith === undefined) {
         String.prototype.startsWith = String.prototype.hasPrefix;
+    }
+
+    /**
+     * If String.prototype.endsWith does not exist String.prototype.hasSuffix will be used
+     * String.prototype.endsWith is not available from Android 4.4.2 to 5.1
+     */
+    if (String.prototype.endsWith === undefined) {
+        String.prototype.endsWith = String.prototype.hasSuffix;
     }
 
     /**
@@ -199,6 +265,11 @@
             return parseFloat((Math.round(value * a) / a));
         }
     };
+
+    // Object.values has just gained support by the latest Node.js version, use a shim, if Object.values doesn't exist.
+    if (!Object.values) {
+        values.shim();
+    }
 
     //////////////////////////////////////////////////////////////////////
     module.exports = Utils;
