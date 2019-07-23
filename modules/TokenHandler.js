@@ -9,6 +9,7 @@
         WebSocketConfig = require('./WebSocketConfig'),
         SupportCode = require('../vendor/SupportCode'),
         Commands = require('../vendor/Commands'),
+        FeatureCheck = require('../vendor/FeatureCheck'),
         CryptoAdapter = require('../vendor/CryptoAdapter'),
         Debug = require('../vendor/Debug'),
         EncryptionType = require('../vendor/EncryptionType'),
@@ -16,12 +17,12 @@
 
         //////////////////////////////////////////////////////////////////////
 
-    var TokenHandler = function TokenHandler(communicatorModule, deviceId, deviceInfo) {
+    var TokenHandler = function TokenHandler(communicatorModule, deviceId, deviceInfo, tokenDidRefresh) {
         var tokenMap = {};
 
         return {
 
-            // Name is ued for debug output
+            // Name is used for debug output
             name: "TokenHandler",
 
             /**
@@ -47,7 +48,7 @@
                     hash = this._otHash(user + ":" + pwHash, saltObj.oneTimeSalt);
 
                     // create the getToken cmd
-                    cmd = Commands.format(Commands.TOKEN.GET_TOKEN, hash, user, msPermission, deviceId, deviceInfo);
+                    cmd = Commands.format(this._getGetTokenCommand(), hash, user, msPermission, deviceId, deviceInfo);
                     Debug.Tokens && console.log("   request a token: " + cmd);
 
                     return communicatorModule.send(cmd, EncryptionType.REQUEST_RESPONSE_VAL).then(function(tResult) {
@@ -114,10 +115,12 @@
             getVerifiedToken: function getVerifiedToken(msPermission, username) {
                 var tokenObj = this.getToken(msPermission, username),
                     promise;
+
                 if (tokenObj) {
-                    promise = this._refreshToken(tokenObj.token, tokenObj.username).then(function (res) {
+                    promise = this._checkOrRefreshToken(tokenObj).then(function (res) {
+                        Debug.Tokens && console.log("  token is verified  " + this._translPerm(msPermission) + " for " + username + " is verified");
                         return tokenObj.token;
-                    }, function (err) {
+                    }.bind(this), function (err) {
                         this._killToken(tokenObj.token, tokenObj.username);
                         throw new Error(err);
                     }.bind(this));
@@ -272,7 +275,7 @@
              * and have to be refreshed as the unsafePassword flag needs to be updated.
              */
             respondToPasswordChange: function respondToPasswordChange() {
-                Debug.Tokens && console.log(this, "respondToPasswordChange");
+                Debug.Tokens && console.log(this.name, "respondToPasswordChange");
                 // store a reference to the connection token. it will be reused later
                 var connToken = this.getToken(WebSocketConfig.permission.APP) || this.getToken(WebSocketConfig.permission.WEB);
 
@@ -285,10 +288,14 @@
                 delete connToken.unsecurePass;
 
                 // launch refresh right away to ensure the attributes (especially unsafePassword) are updated.
-                return this._refreshToken(connToken.token, connToken.username).then(function (res) {
-                    Debug.Tokens && console.log(this, "successfully refreshed after password change.");
-                    updateObject(connToken, res); // store the new attributes (unsecurePass, validUntil & seconds)
-                    this.addToHandledTokens(connToken, connToken.username);
+                return this._refreshToken(connToken).then(function (res) {
+                    Debug.Tokens && console.log(this.name, "successfully refreshed after password change.");
+                    if (FeatureCheck.check(FeatureCheck.feature.TOKEN_REFRESH_AND_CHECK)) {
+                        this._storeNewConnectionToken(connToken, res);
+                    } else {
+                        updateObject(connToken, res); // store the new attributes (unsecurePass, validUntil & seconds)
+                        this.addToHandledTokens(connToken, connToken.username);
+                    }
                 }.bind(this));
             },
 
@@ -317,26 +324,68 @@
             },
 
             /**
-             * Will expand the tokens lifespan. When the promise resolves, it returns an object that contains the infor
-             * until when the token will be valid both as seconds since 1.1.2009 and as date object.
-             * @param token         the token whos lifespan is to be expanded
-             * @param username      the username whom the token belongs to.
-             * @returns {*}     promise that resolves with an object that contains how long the token will be valid
+             * Will ask the Miniserver whether or not the token is still valid. Resolves if it is, rejects if it's not.
+             * @param tokenObj
+             * @return {*}
+             * @private
              */
-            _refreshToken: function refreshToken(token, username) {
-                var resObj = {
-                    seconds: 0
-                };
-                return this._sendTokenCommand(Commands.TOKEN.REFRESH, token, username).then(function(result) {
-                    resObj = getLxResponseValue(result);
-                    resObj.seconds = resObj.validUntil;
-                    resObj.validUntil = moment.utc([2009, 0, 1, 0, 0, 0]).add(resObj.seconds, "seconds");
-                    return resObj;
-                }, function (err) {
-                    console.error("Could not refresh the token of " + username + "!");
+            _checkToken: function _checkToken(tokenObj) {
+                Debug.Tokens && console.log(this.name, "_checkToken: " + tokenObj.username + " - Perm: " + this._translPerm(tokenObj.msPermission));
+
+                return this._sendTokenCommand(Commands.TOKEN.CHECK, tokenObj.token, tokenObj.username).then(function(result) {
+                    Debug.Tokens && console.log("Check for token succeeded!");
+                    return getLxResponseValue(result);
+                }.bind(this), function (err) {
+                    console.error("Check for token " + tokenObj.username + " with permission " + this._translPerm(tokenObj.msPermission) + " failed!");
                     console.error(JSON.stringify(err));
                     throw err;
                 }.bind(this));
+            },
+
+            /**
+             * Will expand the tokens lifespan. When the promise resolves, it returns an object that contains the infor
+             * until when the token will be valid both as seconds since 1.1.2009 and as date object.
+             * @param tokenObj
+             * @returns {*}     promise that resolves with an object that contains how long the token will be valid
+             */
+            _refreshToken: function _refreshToken(tokenObj) {
+                Debug.Tokens && console.log(this.name, "_refreshToken: " + tokenObj.username + " - Perm: " + this._translPerm(tokenObj.msPermission));
+
+                return this._sendTokenCommand(this._getRefreshCommand(), tokenObj.token, tokenObj.username).then(function(result) {
+                    return getLxResponseValue(result);
+                }.bind(this), function (err) {
+                    console.error("Could not refresh the token of '" + tokenObj.username + "' with permission + " + this._translPerm(tokenObj.msPermission));
+                    console.error(JSON.stringify(err));
+                    throw err;
+                }.bind(this));
+            },
+
+            _checkOrRefreshToken: function _checkOrRefreshToken(tokenObj) {
+                Debug.Tokens && console.log(this.name, "_checkOrRefreshToken: " + JSON.stringify(tokenObj));
+                if (FeatureCheck.check(FeatureCheck.feature.TOKEN_REFRESH_AND_CHECK)) {
+                    return this._checkToken(tokenObj);
+                } else {
+                    return this._refreshToken(tokenObj);
+                }
+            },
+
+            /**
+             * Will transfer all the attributes needed from the old to the new object & then dispatch it in order to be
+             * kept alive, stored, updated inside other components and persisted to the filesystem.
+             * @param oldTokenObj
+             * @param newTokenObj
+             * @private
+             */
+            _storeNewConnectionToken: function _storeNewConnectionToken(oldTokenObj, newTokenObj) {
+                Debug.Tokens && console.log(this.name, "_storeNewConnectionToken: " + oldTokenObj.username);
+
+                // ensure all necessary information is available.
+                newTokenObj.username = oldTokenObj.username;
+                newTokenObj.msPermission = oldTokenObj.msPermission;
+                newTokenObj.tokenRights = oldTokenObj.tokenRights;
+
+                // emit to ensure it is persisted too.
+                tokenDidRefresh && tokenDidRefresh(newTokenObj);
             },
 
             /**
@@ -405,9 +454,11 @@
              * @private
              */
             _startKeepAlive: function _startKeepAlive(tokenObj, msPermission) {
+                // The Miniserver time origin is the first of January 2019
                 var expireDate = moment.utc([2009, 0, 1, 0, 0, 0]).add(tokenObj.validUntil, "seconds"),
                     currDate = moment(),
                     delta = expireDate - currDate;
+                Debug.Tokens && console.log(this.name, "_startKeepAlive: " + this._translPerm(msPermission));
 
                 if (delta < 0 || !tokenObj.validUntil || isNaN(delta)) {
                     // token lifespan unknown or negative, try to refresh right away!
@@ -415,7 +466,7 @@
                 }
 
                 // refresh it at least every day. BTW: the interval mustn't exceed the integer max, otherwise it will fire repeatedly
-                delta = Math.min(delta / 3, MAX_REFRESH_DELAY);
+                delta = Math.min(delta * 0.9, MAX_REFRESH_DELAY);
 
                 if (!msPermission) {
                     msPermission = 0;
@@ -424,17 +475,36 @@
                     tokenObj.timeouts = {};
                 }
 
-                Debug.Tokens && console.log(this.name, "_startKeepAlive: " + this._translPerm(msPermission));
-                tokenObj.timeouts[msPermission] = setTimeout(function() {
-                    delete tokenObj.timeouts[msPermission];
+                tokenObj.timeouts[msPermission] = setTimeout(this._keepAliveFired.bind(this, tokenObj, msPermission), delta);
+            },
 
-                    this._refreshToken(tokenObj.token, tokenObj.username).then(function(res) {
-                        tokenObj.validUntil = res.seconds;
+            _keepAliveFired: function _keepAliveFired(tokenObj, msPermission) {
+                Debug.Tokens && console.log(this.name, "_keepAliveFired");
+
+                delete tokenObj.timeouts[msPermission];
+
+                this._refreshToken(tokenObj).then(function(res) {
+
+                    if (FeatureCheck.check(FeatureCheck.feature.TOKEN_REFRESH_AND_CHECK)) {
+                        // ensure the old token is no longer around.
+                        this._deleteToken(tokenObj.token);
+
+                        // ensure the new one is properly stored.
+                        if (this._isConnectionToken(tokenObj)) {
+                            // connection tokens need to be persisted, which is done by the CommComp.
+                            this._storeNewConnectionToken(tokenObj, res);
+                        } else {
+                            res.msPermission = tokenObj.msPermission;
+                            res.username = tokenObj.username;
+                            this._storeTokenObj(res);
+                            this._startKeepAlive(res, msPermission);
+                        }
+                    } else {
                         this._startKeepAlive(tokenObj, msPermission);
-                    }.bind(this), function (err) {
-                        this._handleRefreshFailed(tokenObj, err);
-                    }.bind(this))
-                }.bind(this), delta);
+                    }
+                }.bind(this), function (err) {
+                    this._handleRefreshFailed(tokenObj, err);
+                }.bind(this))
             },
 
             /**
@@ -482,6 +552,13 @@
                 }.bind(this));
             },
 
+            /**
+             * Ensures the object provided has the minimum set of attributes (token, user, permission), then stores it
+             * in the tokenMap.
+             * @param tokenObj
+             * @return {*|{username: *, token: *, validUntil: *, msPermission: *}}
+             * @private
+             */
             _storeTokenObj: function _storeTokenObj(tokenObj) {
                 Debug.Tokens && console.log(this.name, "_storeTokenObj: usr=" + tokenObj.username + ", perm=" +
                     this._translPerm(tokenObj.msPermission));
@@ -583,6 +660,24 @@
                 }
 
                 return tkObj;
+            },
+
+            /**
+             * Returns the right getToken command, as new Miniservers support a separate command for JWT & legacy tokens
+             * @return {string}
+             * @private
+             */
+            _getGetTokenCommand: function _getGetTokenCommand() {
+                return FeatureCheck.check(FeatureCheck.feature.JWT_SUPPORT) ? Commands.TOKEN.GET_JWT_TOKEN : Commands.TOKEN.GET_TOKEN;
+            },
+
+            /**
+             * Returns the proper refresh command, as new Miniservers support a separate command for JWT & legacy tokens
+             * @return {string}
+             * @private
+             */
+            _getRefreshCommand: function _getRefreshCommand() {
+                return FeatureCheck.check(FeatureCheck.feature.JWT_SUPPORT)  ? Commands.TOKEN.REFRESH : Commands.TOKEN.REFRESH_JWT;
             }
         }
     };

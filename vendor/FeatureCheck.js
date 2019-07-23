@@ -9,7 +9,12 @@
         ENCRYPTION_CFG_VERSION: "8.1.10.14",
         TOKENS: "9.0.7.25",
         ENCRYPTED_SOCKET_CONNECTION: "7.4.4.1",
-        ENCRYPTED_CONNECTION_FULLY: "8.1.10.14"
+        ENCRYPTED_CONNECTION_FULLY: "8.1.10.14",
+        ENCRYPTED_CONNECTION_HTTP_USER: "8.1.10.4",
+        TOKEN_REFRESH_AND_CHECK: "10.0.9.13",       // Tokens may now change when being refreshed. New webservice for checking token validity without changing them introduced
+        SECURE_HTTP_REQUESTS: "7.1.9.17",
+        JWT_SUPPORT: "10.1.12.5"                    // From this version onwards, JWTs are handled using separate commands to ensure regular apps remain unchanged.
+
     };
 
     FeatureCheck.setCurrentVersion = function setCurrentVersion(current) {
@@ -43,9 +48,6 @@
     };
 
     var _partify = function _partify(versionString) {
-        if (!versionString) {
-            debugger;
-        }
         var prts = [];
         versionString.split(".").forEach(function (prt) {
             prts.push(parseInt(prt));

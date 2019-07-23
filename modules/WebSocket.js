@@ -101,7 +101,7 @@
 
             if (!FeatureCheck.hasCurrentVersion()) {
                 Debug.Socket.Basic && console.info("No Version defined, requesting version for Feature checking");
-                this._httpCom.requestValue(resHost, "jdev/cfg/apiKey").then(function succ(value) {
+                this._httpCom.requestValue(resHost, Commands.GET_API_KEY).then(function succ(value) {
                     FeatureCheck.setCurrentVersion(value.version);
                     featureDef.resolve();
                 }, function(e) {
@@ -114,7 +114,9 @@
             return featureDef.promise.then(function() {
                 Debug.Socket.Basic && console.log(this.name + "try to open WebSocket to host:", resHost);
 
-                this._tokenHandler = new TokenHandler(this, this._config.uniqueId, this._config.deviceInfo);
+                this._tokenHandler = new TokenHandler(this, this._config.uniqueId, this._config.deviceInfo, function(tkObj) {
+                    this._config.delegate.socketOnTokenRefresh && this._config.delegate.socketOnTokenRefresh(this, tkObj);
+                }.bind(this));
                 var encryptionAllowed = FeatureCheck.check(FeatureCheck.feature.TOKENS),
                     supportsTokens = FeatureCheck.check(FeatureCheck.feature.TOKENS);
 
@@ -1069,10 +1071,10 @@
                     dataType: "json"
                 }).then(function(result) {
                     // Node.js already parses the result, Javascript doesn't
-                    if (typeof result === "object") {
-                        resolve(result.IP);
+                    if (typeof result.data === "object") {
+                        resolve(result.data.IP);
                     } else {
-                        resolve(JSON.parse(result).IP);
+                        resolve(JSON.parse(result.data).IP);
                     }
                 }, reject);
             }
