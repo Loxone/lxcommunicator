@@ -1493,7 +1493,7 @@
              * @private
              */
             _getGetTokenCommand: function _getGetTokenCommand() {
-                return FeatureCheck.check(FeatureCheck.Feature.JWT_SUPPORT) ? Commands.TOKEN.GET_JWT_TOKEN : Commands.TOKEN.GET_TOKEN;
+                return FeatureCheck.check(FeatureCheck.feature.JWT_SUPPORT) ? Commands.TOKEN.GET_JWT_TOKEN : Commands.TOKEN.GET_TOKEN;
             },
 
             /**
@@ -1502,7 +1502,7 @@
              * @private
              */
             _getRefreshCommand: function _getRefreshCommand() {
-                return FeatureCheck.check(FeatureCheck.Feature.JWT_SUPPORT)  ? Commands.TOKEN.REFRESH : Commands.TOKEN.REFRESH_JWT;
+                return FeatureCheck.check(FeatureCheck.feature.JWT_SUPPORT)  ? Commands.TOKEN.REFRESH : Commands.TOKEN.REFRESH_JWT;
             }
         }
     };
@@ -25348,30 +25348,35 @@ utils.intFromLE = intFromLE;
 
 },{"bn.js":47,"minimalistic-assert":197,"minimalistic-crypto-utils":198}],149:[function(_dereq_,module,exports){
 module.exports={
-  "_from": "elliptic@^6.0.0",
+  "_args": [
+    [
+      "elliptic@6.4.1",
+      "/Users/davidgolzhauser/WebstormProjects/lxcommunicator"
+    ]
+  ],
+  "_from": "elliptic@6.4.1",
   "_id": "elliptic@6.4.1",
   "_inBundle": false,
   "_integrity": "sha512-BsXLz5sqX8OHcsh7CqBMztyXARmGQ3LWPtGjJi6DiJHq5C/qvi9P3OqgswKSDftbu8+IoI/QDTAm2fFnQ9SZSQ==",
   "_location": "/elliptic",
   "_phantomChildren": {},
   "_requested": {
-    "type": "range",
+    "type": "version",
     "registry": true,
-    "raw": "elliptic@^6.0.0",
+    "raw": "elliptic@6.4.1",
     "name": "elliptic",
     "escapedName": "elliptic",
-    "rawSpec": "^6.0.0",
+    "rawSpec": "6.4.1",
     "saveSpec": null,
-    "fetchSpec": "^6.0.0"
+    "fetchSpec": "6.4.1"
   },
   "_requiredBy": [
     "/browserify-sign",
     "/create-ecdh"
   ],
   "_resolved": "https://registry.npmjs.org/elliptic/-/elliptic-6.4.1.tgz",
-  "_shasum": "c2d0b7776911b86722c632c3c06c60f2f819939a",
-  "_spec": "elliptic@^6.0.0",
-  "_where": "/Users/david/Entwicklung/Loxone/LxCommunicator/node_modules/browserify-sign",
+  "_spec": "6.4.1",
+  "_where": "/Users/davidgolzhauser/WebstormProjects/lxcommunicator",
   "author": {
     "name": "Fedor Indutny",
     "email": "fedor@indutny.com"
@@ -25379,7 +25384,6 @@ module.exports={
   "bugs": {
     "url": "https://github.com/indutny/elliptic/issues"
   },
-  "bundleDependencies": false,
   "dependencies": {
     "bn.js": "^4.4.0",
     "brorand": "^1.0.1",
@@ -25389,7 +25393,6 @@ module.exports={
     "minimalistic-assert": "^1.0.0",
     "minimalistic-crypto-utils": "^1.0.0"
   },
-  "deprecated": false,
   "description": "EC cryptography",
   "devDependencies": {
     "brfs": "^1.4.3",
@@ -46402,6 +46405,12 @@ module.exports = _dereq_('../package.json').version;
 
 },{"../package.json":260}],260:[function(_dereq_,module,exports){
 module.exports={
+  "_args": [
+    [
+      "websocket@1.0.28",
+      "/Users/davidgolzhauser/WebstormProjects/lxcommunicator"
+    ]
+  ],
   "_from": "websocket@1.0.28",
   "_id": "websocket@1.0.28",
   "_inBundle": false,
@@ -46421,13 +46430,11 @@ module.exports={
     "fetchSpec": "1.0.28"
   },
   "_requiredBy": [
-    "#USER",
     "/"
   ],
   "_resolved": "https://registry.npmjs.org/websocket/-/websocket-1.0.28.tgz",
-  "_shasum": "9e5f6fdc8a3fe01d4422647ef93abdd8d45a78d3",
-  "_spec": "websocket@1.0.28",
-  "_where": "/Users/david/Entwicklung/Loxone/LxCommunicator",
+  "_spec": "1.0.28",
+  "_where": "/Users/davidgolzhauser/WebstormProjects/lxcommunicator",
   "author": {
     "name": "Brian McKelvey",
     "email": "theturtle32@gmail.com",
@@ -46437,7 +46444,6 @@ module.exports={
   "bugs": {
     "url": "https://github.com/theturtle32/WebSocket-Node/issues"
   },
-  "bundleDependencies": false,
   "config": {
     "verbose": false
   },
@@ -46454,7 +46460,6 @@ module.exports={
     "typedarray-to-buffer": "^3.1.5",
     "yaeti": "^0.0.6"
   },
-  "deprecated": false,
   "description": "Websocket Client & Server Library implementing the WebSocket protocol as specified in RFC 6455.",
   "devDependencies": {
     "buffer-equal": "^1.0.0",
@@ -51334,9 +51339,7 @@ module.exports={
         var self = this;
 
         // clean up host:
-        if (host.indexOf("http://") === 0) { // we can't use our hasPrefix/hasSuffix helpers because of webworkers!
-            host = host.replace("http://", "");
-        }
+        host = host.replace(/^http[s]?:\/\//, ""); // Remove the HTTP protocols as we use the Websocket protocol here...
         if (host.indexOf("/", (host.length - "/".length)) !== -1) {
             host = host.substring(0, host.length -1); // remove padding / -> is added below again!
         }

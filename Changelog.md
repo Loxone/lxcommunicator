@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Automatic Token refresh didn't work
 - Node.js crashes due to missing Object.value() function
 - Implemented new JWT (JSON Web Token) handling
+- Fixed HTTPS websocket handling
 
 ## [1.0.0] - 2018-06-06
 ### Fixed
