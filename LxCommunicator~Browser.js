@@ -409,7 +409,9 @@
 
     var $ = _dereq_('../vendor/JqueryWrapper'),
         CryptoJS = _dereq_('crypto-js'),
+        CryptoAdapter = _dereq_('../vendor/CryptoAdapter'),
         JSEncryptWrapper = _dereq_('node-jsencrypt'),
+        FeatureCheck = _dereq_('../vendor/FeatureCheck'),
         Commands = _dereq_('../vendor/Commands'),
         DEBUG = _dereq_('../vendor/Debug').HttpRequest;
 
@@ -486,17 +488,19 @@
             },
 
             /**
-             * Will launch an authentication request based on the username and password provided. The credetnials will be hashed
+             * Will launch an authentication request based on the username and password provided. The credentials will be hashed
              * using the otSalt provided. The request will NOT be encrypted.
              * @param url
              * @param username
              * @param password
-             * @param otSalt    the onetime salt to use for authenticating
+             * @param otSalt            the onetime salt to use for authenticating
+             * @param currentMsVersion
              * @returns {*}
              */
-            authViaPassword: function authViaPassword(url, username, password, otSalt) {
-                var authData = {
-                    auth: CryptoJS.HmacSHA1(username + ":" + password, this._hexToString(otSalt)).toString(),
+            authViaPassword: function authViaPassword(url, username, password, otSalt, currentMsVersion) {
+                var hashAlg = FeatureCheck.check(FeatureCheck.feature.SHA_256, currentMsVersion) ? CryptoAdapter.HASH_ALGORITHM.SHA256 : CryptoAdapter.HASH_ALGORITHM.SHA1,
+                    authData = {
+                    auth: CryptoAdapter["Hmac" + hashAlg](username + ":" + password, "utf8", otSalt, "hex", "hex"),
                     user: username
                 };
                 return this.request(url, Commands.STRUCTURE_FILE_DATE, authData);
@@ -543,11 +547,11 @@
 
                 return this._requestTokenSalts(url, username).then(function(saltObj) {
                     // create a SHA1 hash of the (salted) password
-                    pwHash = CryptoJS.SHA1(password + ":" + saltObj.salt).toString();
+                    pwHash = CryptoAdapter[saltObj.hashAlg](password + ":" + saltObj.salt).toString();
                     pwHash = pwHash.toUpperCase();
 
                     // hash with user and otSalt
-                    hash = this._otHash(username + ":" + pwHash, saltObj.oneTimeSalt);
+                    hash = this._otHash(username + ":" + pwHash, saltObj.oneTimeSalt, saltObj.hashAlg);
 
                     // build up the token command
                     cmd = this._getTokenCmd(hash, username, type, deviceUuid, deviceInfo);
@@ -565,15 +569,13 @@
              * Will create a oneTime hash of the payload using the salt provided
              * @param payload
              * @param otSalt
+             * @param hashAlg
              * @returns {string}
              * @private
              */
-            _otHash: function _otHash(payload, otSalt) {
-                var msg = CryptoJS.enc.Utf8.parse(payload);
-                var k = CryptoJS.enc.Hex.parse(otSalt);
-                var hash = CryptoJS.HmacSHA1(msg, k);
-
-                return hash.toString(CryptoJS.enc.Hex);
+            _otHash: function _otHash(payload, otSalt, hashAlg) {
+                hashAlg = hashAlg || CryptoAdapter.HASH_ALGORITHM.SHA1;
+                return CryptoAdapter["Hmac" + hashAlg](payload, "utf8", otSalt, "hex", "hex");
             },
 
             /**
@@ -601,7 +603,8 @@
                 return this.lxEncRequestValue(url, cmd).then(function(result) {
                     return {
                         oneTimeSalt: result.key,
-                        salt: result.salt
+                        salt: result.salt,
+                        hashAlg: result.hashAlg || CryptoAdapter.HASH_ALGORITHM.SHA1
                     };
                 });
             },
@@ -822,7 +825,7 @@
 
 }).call(this);
 
-},{"../vendor/Commands":262,"../vendor/Debug":265,"../vendor/JqueryWrapper":269,"crypto-js":97,"node-jsencrypt":200}],4:[function(_dereq_,module,exports){
+},{"../vendor/Commands":262,"../vendor/CryptoAdapter":263,"../vendor/Debug":265,"../vendor/FeatureCheck":268,"../vendor/JqueryWrapper":269,"crypto-js":97,"node-jsencrypt":200}],4:[function(_dereq_,module,exports){
 (function() {
     var MAX_REFRESH_DELAY = 1000 * 60 * 60 * 24;    // = 1 Day
 
@@ -865,12 +868,12 @@
 
                 return this._requestUserSalt(user).then(function(saltObj) {
 
-                    // create a SHA1 hash of the (salted) password
-                    pwHash = CryptoAdapter.SHA1(password + ":" + saltObj.salt);
+                    // create a SHA1 or SHA256 hash of the (salted) password
+                    pwHash = CryptoAdapter[saltObj.hashAlg](password + ":" + saltObj.salt);
                     pwHash = pwHash.toUpperCase();
 
                     // hash with user and otSalt
-                    hash = this._otHash(user + ":" + pwHash, saltObj.oneTimeSalt);
+                    hash = this._otHash(user + ":" + pwHash, saltObj.oneTimeSalt, saltObj.hashAlg);
 
                     // create the getToken cmd
                     cmd = Commands.format(this._getGetTokenCommand(), hash, user, msPermission, deviceId, deviceInfo);
@@ -1256,20 +1259,23 @@
                 return communicatorModule.send(cmd, EncryptionType.REQUEST_RESPONSE_VAL).then(function(result) {
                     return {
                         oneTimeSalt: result.LL.value.key,
-                        salt: result.LL.value.salt
+                        salt: result.LL.value.salt,
+                        hashAlg: result.LL.value.hashAlg || CryptoAdapter.HASH_ALGORITHM.SHA1
                     };
                 });
             },
 
             /**
-             * Helper method that will create a oneTimeHash (HmacSHA1) of the payload using the oneTimeSalt provided.
+             * Helper method that will create a oneTimeHash (HmacSHA1 or HmacSHA256) of the payload using the oneTimeSalt provided.
              * @param payload       the payload to hash
-             * @param oneTimeSalt   the onetime salt to use for the HmacSHA1
+             * @param oneTimeSalt   the onetime salt to use for the HmacSHA1 or HmacSHA256
+             * @param [hashAlg]     the hashing algorithm to be used
              * @returns {string|*}
              * @private
              */
-            _otHash: function _otHash(payload, oneTimeSalt) {
-                return CryptoAdapter.HmacSHA1(payload, "utf8", oneTimeSalt, "hex", "hex");
+            _otHash: function _otHash(payload, oneTimeSalt, hashAlg) {
+                hashAlg = hashAlg || CryptoAdapter.HASH_ALGORITHM.SHA1;
+                return CryptoAdapter["Hmac" + hashAlg](payload, "utf8", oneTimeSalt, "hex", "hex");
             },
 
             /**
@@ -1586,7 +1592,8 @@
             salt: null, // current salt, must alternate with each encrypted command
             key: null,  // AES key for the current session
             iv: null    // AES iv
-        }
+        };
+        this._hashAlg = CryptoAdapter.HASH_ALGORITHM.SHA1;
     }
 
 
@@ -1634,6 +1641,8 @@
                 }.bind(this));
                 var encryptionAllowed = FeatureCheck.check(FeatureCheck.feature.TOKENS),
                     supportsTokens = FeatureCheck.check(FeatureCheck.feature.TOKENS);
+
+                this._hashAlg = FeatureCheck.check(FeatureCheck.feature.SHA_256);
 
                 if (this._ws && this._ws.ws && !this._ws.socketClosed) {
                     console.warn(this.name + "===============================================================");
@@ -1748,7 +1757,7 @@
 
     WebSocket.prototype._authenticate = function _authenticate(user, password, oneTimeSalt, encrypted) {
         var creds = user + ":" + password,
-            hash = CryptoAdapter.HmacSHA1(creds, "utf8", oneTimeSalt, "hex", "hex"),
+            hash = CryptoAdapter["Hmac" + this._hashAlg](creds, "utf8", oneTimeSalt, "hex", "hex"),
             cmd;
 
         // starting pw based authentication.
@@ -1779,7 +1788,7 @@
     };
 
     /**
-     * Will create a HMAC-SHA1 hash based on the token and the oneTimeSalt provided & send it to
+     * Will create a HmacSHA1 or HmacSHA256 hash based on the token and the oneTimeSalt provided & send it to
      * the Miniserver in an authentication request.
      * @param user          the user for which the authentication request is made
      * @param token         the authentication token for this user
@@ -1788,7 +1797,7 @@
      */
     WebSocket.prototype._authWithToken = function _authWithToken(user, token, permission, oneTimeSalt) {
         Debug.Socket.Basic && console.log("WebSocket", "authenticate with token");
-        var hash = CryptoAdapter.HmacSHA1(token, "utf8", oneTimeSalt, "hex", "hex"),
+        var hash = CryptoAdapter["Hmac" + this._hashAlg](token, "utf8", oneTimeSalt, "hex", "hex"),
             cmd = Commands.format(Commands.TOKEN.AUTHENTICATE, hash, user),
             response;
 
@@ -1857,8 +1866,8 @@
         var encryptionType = FeatureCheck.check(FeatureCheck.feature.ENCRYPTED_CONNECTION_FULLY) ? EncryptionType.REQUEST_RESPONSE_VAL : EncryptionType.NONE;
         return this.send(Commands.GET_KEY, encryptionType).then(function(res) {
             var oneTimeSalt = getLxResponseValue(res, true);
-            return CryptoAdapter.HmacSHA1(payload, "utf8", oneTimeSalt, "hex", "hex");
-        });
+            return CryptoAdapter["Hmac" + this._hashAlg](payload, "utf8", oneTimeSalt, "hex", "hex");
+        }.bind(this));
     };
 
     /**
@@ -46708,7 +46717,12 @@ module.exports={
 
     //////////////////////////////////////////////////////////////////////
 
-    var CryptoAdapter = {};
+    var CryptoAdapter = {
+        HASH_ALGORITHM: {
+            SHA1: "SHA1",
+            SHA256: "SHA256"
+        }
+    };
 
     /**
      * Creates a Hmac-SHA1 hash of the provided message
@@ -46730,6 +46744,28 @@ module.exports={
 
     CryptoAdapter.SHA1 = function SHA1(message) {
         return CryptoJS.SHA1(message).toString();
+    };
+
+    /**
+     * Creates a Hmac-SHA1 hash of the provided message
+     * @param {string} message text which should be hashed
+     * @param {'utf8'|'hex'} messageEncoding encoding of the message
+     * @param key which is used to create the hash
+     * @param {'utf8'|'hex'} keyEncoding encoding of the key
+     * @param {'utf8'|'hex'} hashEncoding encoding of he result
+     * @returns {string|*} resulting hash
+     */
+    CryptoAdapter.HmacSHA256 = function HmacSHA256(message, messageEncoding, key, keyEncoding, hashEncoding) {
+        var msg = getEncoding(messageEncoding).parse(message);
+        var k = getEncoding(keyEncoding).parse(key);
+        var hash = CryptoJS.HmacSHA256(msg, k);
+
+        return hash.toString(getEncoding(hashEncoding || 'utf8'));
+    };
+
+
+    CryptoAdapter.SHA256 = function SHA256(message) {
+        return CryptoJS.SHA256(message).toString();
     };
 
 
@@ -50914,8 +50950,8 @@ module.exports={
         ENCRYPTED_CONNECTION_HTTP_USER: "8.1.10.4",
         TOKEN_REFRESH_AND_CHECK: "10.0.9.13",       // Tokens may now change when being refreshed. New webservice for checking token validity without changing them introduced
         SECURE_HTTP_REQUESTS: "7.1.9.17",
-        JWT_SUPPORT: "10.1.12.5"                    // From this version onwards, JWTs are handled using separate commands to ensure regular apps remain unchanged.
-
+        JWT_SUPPORT: "10.1.12.5",                   // From this version onwards, JWTs are handled using separate commands to ensure regular apps remain unchanged.
+        SHA_256: "10.3.7.22"
     };
 
     FeatureCheck.setCurrentVersion = function setCurrentVersion(current) {
