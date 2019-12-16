@@ -1508,7 +1508,7 @@
              * @private
              */
             _getRefreshCommand: function _getRefreshCommand() {
-                return FeatureCheck.check(FeatureCheck.feature.JWT_SUPPORT)  ? Commands.TOKEN.REFRESH : Commands.TOKEN.REFRESH_JWT;
+                return FeatureCheck.check(FeatureCheck.feature.JWT_SUPPORT)  ? Commands.TOKEN.REFRESH_JWT : Commands.TOKEN.REFRESH;
             }
         }
     };
