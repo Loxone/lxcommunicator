@@ -53,6 +53,29 @@ npm install lxcommunicator --save
 ## Example
 **Please take a look in the `./test` folder and run `npm test` to run `./test/index.js` in Node.js**
 
+## Establish a connection with SSL (`https://` and `wss://`)
+- HTTPS connection is *only* supported when using on the Miniserver v2
+- If no custom certificate is used all Loxone CloudDNS URLs will automatically resolve to use SSL if available
+- If the Internal IP or External IP or any other Domain name is used HTTPS is not automatically chosen
+
+**Establish a local SSL connection**
+- If the Miniserver v2 is using the Loxone Cloud DNS
+  - It is mandatory to enter the URL in the following format to ensure the SSL certificate matches the domain. This prevents the `ERR_CERT_COMMON_NAME_INVALID` error.
+ 
+ | IP of the Miniserver | Serial Number of the Miniserver | Resulting URL                                           |
+ |:---------------------|:--------------------------------|:--------------------------------------------------------|
+ | 89.23.45.12          | 504f94a00001                    | https://89-23-45-12.504f94a00001.dyndns.loxonecloud.com |
+ 
+ **Common issues when using SSL (`https://` and `wss://`)**
+ - Expired Certificate
+   - Verify your expiration date
+ - Common name won't match
+   - Verify that your domain matches the common name defined in the certificate
+ - Wrong HTTPS port
+   - Verify that you port forward the Miniservers v2 port `443` on your router. The external port can be defined as you wish.
+   
+> **Tip:**<br>Validate your url in the browser, it allows you to verify the SSL Certificate against the URL and view the browsers error message.
+
 ## Create Browser module
 - Execute the `browserify.js` script, it will create the browser modules
 ````
@@ -61,4 +84,4 @@ node ./browserify.js
 
 ## Set Debug flags
 Go to `./vendor/Debug.js` and adopt the flags to your needs.<br>
-> **Note:**<br>Don't forget to execute the browserify script everytime you make a change in this module!
+> **Note:**<br>Don't forget to execute the browserify script every time you make a change in this module!

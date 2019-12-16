@@ -1607,81 +1607,55 @@
      * @returns {promise|*} promise whether the attempt was successful or not
      */
     WebSocket.prototype.open = function open(host, user, password, authToken) {
-        var featureDef = Q.defer();
-        return _resolveHost(host).then(function (resHost) {
-            if (this._config.protocol === WebSocketConfig.protocol.WS) {
-                resHost = "http://" + resHost;
+        this._httpCom = new HttpRequest();
+        return this._resolveHost(host).then(function (resHost) {
+            Debug.Socket.Basic && console.log(this.name + "try to open WebSocket to host:", resHost);
+
+            this._tokenHandler = new TokenHandler(this, this._config.uniqueId, this._config.deviceInfo, function(tkObj) {
+                this._config.delegate.socketOnTokenRefresh && this._config.delegate.socketOnTokenRefresh(this, tkObj);
+            }.bind(this));
+            var encryptionAllowed = FeatureCheck.check(FeatureCheck.feature.TOKENS),
+                supportsTokens = FeatureCheck.check(FeatureCheck.feature.TOKENS);
+
+            this._hashAlg = FeatureCheck.check(FeatureCheck.feature.SHA_256) ? CryptoAdapter.HASH_ALGORITHM.SHA256 : CryptoAdapter.HASH_ALGORITHM.SHA1;
+
+            if (this._ws && this._ws.ws && !this._ws.socketClosed) {
+                console.warn(this.name + "===============================================================");
+                console.warn(this.name + "WARNING: WebSocket is maybe still opened! readyState:", this._ws.ws.readyState);
+                console.warn(this.name + " - we now open another new WebSocket..");
+                console.warn(this.name + " - old WebSocket will be closed..");
+                console.warn(this.name + "===============================================================");
+
+                this._ws.close(SupportCode.WEBSOCKET_MANUAL_CLOSE);
+            }
+
+            this._socketPromise = Q.defer();
+
+            this._wrongPassword = false;
+            this._invalidToken = false;
+
+            if (this._isDownloadSocket) {
+                this._ws = new WebSocketWrapper(resHost, this._config.protocol, true, true); // long timeout, no keepalive
             } else {
-                resHost = "https://" + resHost;
+                this._ws = new WebSocketWrapper(resHost, this._config.protocol);
             }
 
-            if (resHost.slice(-1) !== "/") {
-                resHost = resHost + "/";
-            }
-
-            this._httpCom = new HttpRequest();
-
-            if (!FeatureCheck.hasCurrentVersion()) {
-                Debug.Socket.Basic && console.info("No Version defined, requesting version for Feature checking");
-                this._httpCom.requestValue(resHost, Commands.GET_API_KEY).then(function succ(value) {
-                    FeatureCheck.setCurrentVersion(value.version);
-                    featureDef.resolve();
-                }, function(e) {
-                    featureDef.reject(e);
-                });
-            } else {
-                featureDef.resolve();
-            }
-
-            return featureDef.promise.then(function() {
-                Debug.Socket.Basic && console.log(this.name + "try to open WebSocket to host:", resHost);
-
-                this._tokenHandler = new TokenHandler(this, this._config.uniqueId, this._config.deviceInfo, function(tkObj) {
-                    this._config.delegate.socketOnTokenRefresh && this._config.delegate.socketOnTokenRefresh(this, tkObj);
-                }.bind(this));
-                var encryptionAllowed = FeatureCheck.check(FeatureCheck.feature.TOKENS),
-                    supportsTokens = FeatureCheck.check(FeatureCheck.feature.TOKENS);
-
-                this._hashAlg = FeatureCheck.check(FeatureCheck.feature.SHA_256) ? CryptoAdapter.HASH_ALGORITHM.SHA256 : CryptoAdapter.HASH_ALGORITHM.SHA1;
-
-                if (this._ws && this._ws.ws && !this._ws.socketClosed) {
-                    console.warn(this.name + "===============================================================");
-                    console.warn(this.name + "WARNING: WebSocket is maybe still opened! readyState:", this._ws.ws.readyState);
-                    console.warn(this.name + " - we now open another new WebSocket..");
-                    console.warn(this.name + " - old WebSocket will be closed..");
-                    console.warn(this.name + "===============================================================");
-
-                    this._ws.close(SupportCode.WEBSOCKET_MANUAL_CLOSE);
-                }
-
-                this._socketPromise = Q.defer();
-
-                this._wrongPassword = false;
-                this._invalidToken = false;
-
+            this._ws.onOpen = this.wsOpened.bind(this, resHost, user, password, encryptionAllowed, supportsTokens, authToken);
+            this._ws.onMessageError = this._messageErrorHandler.bind(this);
+            this._ws.onTextMessage = this._textMessageHandler.bind(this);
+            this._ws.onBinaryMessage = this._binaryMessageHandler.bind(this);
+            this._ws.onClose = this._closeHandler.bind(this);
+            this._ws.onError = this._errorHandler.bind(this);
+            this._ws.incomingDataProgress = function (progress) {
                 if (this._isDownloadSocket) {
-                    this._ws = new WebSocketWrapper(resHost, this._config.protocol, true, true); // long timeout, no keepalive
-                } else {
-                    this._ws = new WebSocketWrapper(resHost, this._config.protocol);
+                    this._config.delegate.socketOnDataProgress && this._config.delegate.socketOnDataProgress(this, progress);
                 }
+            }.bind(this);
 
-                this._ws.onOpen = this.wsOpened.bind(this, resHost, user, password, encryptionAllowed, supportsTokens, authToken);
-                this._ws.onMessageError = this._messageErrorHandler.bind(this);
-                this._ws.onTextMessage = this._textMessageHandler.bind(this);
-                this._ws.onBinaryMessage = this._binaryMessageHandler.bind(this);
-                this._ws.onClose = this._closeHandler.bind(this);
-                this._ws.onError = this._errorHandler.bind(this);
-                this._ws.incomingDataProgress = function (progress) {
-                    if (this._isDownloadSocket) {
-                        this._config.delegate.socketOnDataProgress && this._config.delegate.socketOnDataProgress(this, progress);
-                    }
-                }.bind(this);
-
-                return this._socketPromise.promise.then(function() {
-                    if (!this._isDownloadSocket) { // DLSocket has no keepalive
-                        this._ws.startKeepalive();
-                    }
-                }.bind(this));
+            return this._socketPromise.promise.then(function() {
+                if (!this._isDownloadSocket) { // DLSocket has no keepalive
+                    this._ws.startKeepalive();
+                }
             }.bind(this));
         }.bind(this));
     };
@@ -2563,47 +2537,73 @@
     };
 
     /**
-     * Resolves the external IP address from the Loxone CloudDNS if the URL is an Loxone CloudDNS URL
-     * The given URL is resolved if it isn't a CloudDNS URL
-     * @param url The address the Miniserver can be reached with
-     * @return {Promise}
+     * Resolves the given url to the the IP address of the Miniserver or to the HTTPS dyndns url of the Miniserver v2 if applicable
+     * @param url Can be internal or external IP, CloudDNS URL or Custom URL
      * @private
      */
-    var _resolveHost = function(url) {
-        var cloudDNSIndex,
-            isOldDNS,
+    WebSocket.prototype._resolveHost = function _resolveHost(url) {
+        var isOldDNS,
             isNewDNS,
-            serialNo;
-
-        url = url.replace("https://", "");
-        url = url.replace("http://", "");
-        return new Promise(function(resolve, reject) {
+            isLxCloudDNS= false,
             cloudDNSIndex = url.indexOf("dns.loxonecloud.com");
             isOldDNS = cloudDNSIndex === 0;    // Like dns.loxonecloud.com/{serialNo}
             isNewDNS = cloudDNSIndex === 13;    // Like {serialNo}.dns.loxonecloud.com
 
-            // Get the serial number out of the url
-            if (isOldDNS) {
-                serialNo = url.slice(20); // Get the serial number, which is located on the end of the url
-            } else if (isNewDNS) {
-                serialNo = url.slice(0, 12); // Ge the serial number, which is located on the beginning of the url
+        isLxCloudDNS = isOldDNS || isNewDNS;
+
+        if (!url.hasSuffix("/")) {
+            url += "/";
+        }
+
+        if (url.indexOf("http://") === -1 && url.indexOf("https://")) {
+            if (this._config.protocol === WebSocketConfig.protocol.WS) {
+                url = "http://" + url;
+            } else {
+                url = "https://" + url;
+            }
+        }
+
+        // The Loxone Cloud DNS only accepts the "http" protocol, it will automatically redirect to the "https" url if applicable
+        if (isLxCloudDNS) {
+            url = url.replace("https://", "http://");
+        }
+
+        return $.ajax({
+            url: url + Commands.GET_API_KEY,
+            dataType: "json"
+        }).then(function(result) {
+            var resolvedHost,
+                value;
+
+            // There is a difference on how to get the responseUrl in Node.js and in the Browser
+            if (result.request.res) {
+                resolvedHost = result.request.res.responseUrl;
+            } else {
+                resolvedHost = result.request.responseURL;
             }
 
-            if (serialNo) {
-                return $.ajax({
-                    url: "http://dns.loxonecloud.com/?getip&snr=" + serialNo + "&json=true",
-                    dataType: "json"
-                }).then(function(result) {
-                    // Node.js already parses the result, Javascript doesn't
-                    if (typeof result.data === "object") {
-                        resolve(result.data.IP);
-                    } else {
-                        resolve(JSON.parse(result.data).IP);
-                    }
-                }, reject);
+            resolvedHost = resolvedHost.replace(Commands.GET_API_KEY, "");
+
+            if (typeof result.data === "string") {
+                result.data = JSON.parse(result.data);
             }
-            resolve(url);
-        });
+
+            try {
+                value = JSON.parse(result.data.LL.value.replace(/\'/g, '"'));
+            } catch (ex) {
+                value = result.data.LL.value;
+            }
+
+            if (!FeatureCheck.hasCurrentVersion()) {
+                FeatureCheck.setCurrentVersion(value.version);
+            }
+            // Manually set the communication protocol according to the httpsStatus property of the response
+            if (isLxCloudDNS && value.httpsStatus === 1) {
+                this._config._protocol = WebSocketConfig.protocol.WSS;
+            }
+
+            return resolvedHost;
+        }.bind(this));
     };
 
     //////////////////////////////////////////////////////////////////////
@@ -2625,6 +2625,10 @@
      */
     function WebSocketConfig(protocol, uniqueId, deviceInfo, requiredPermission, isDownloadSocket) {
         this._delegate = {};
+        if (Object.values(WebSocketConfig.protocol).indexOf(protocol) === -1) {
+            console.warn(this.name, "Unknown protocol '" + protocol + "' using '" + WebSocketConfig.protocol.WS + "' instead!");
+            protocol = WebSocketConfig.protocol.WS;
+        }
         this._protocol = protocol;
         this._uniqueId = uniqueId;
         this._deviceInfo = deviceInfo;
@@ -4447,7 +4451,6 @@ PEMEncoder.prototype.encode = function encode(data, options) {
 },{"./der":18,"inherits":187}],21:[function(_dereq_,module,exports){
 module.exports = _dereq_('./lib/axios');
 },{"./lib/axios":23}],22:[function(_dereq_,module,exports){
-(function (process){
 'use strict';
 
 var utils = _dereq_('./../utils');
@@ -4456,7 +4459,6 @@ var buildURL = _dereq_('./../helpers/buildURL');
 var parseHeaders = _dereq_('./../helpers/parseHeaders');
 var isURLSameOrigin = _dereq_('./../helpers/isURLSameOrigin');
 var createError = _dereq_('../core/createError');
-var btoa = (typeof window !== 'undefined' && window.btoa && window.btoa.bind(window)) || _dereq_('./../helpers/btoa');
 
 module.exports = function xhrAdapter(config) {
   return new Promise(function dispatchXhrRequest(resolve, reject) {
@@ -4468,22 +4470,6 @@ module.exports = function xhrAdapter(config) {
     }
 
     var request = new XMLHttpRequest();
-    var loadEvent = 'onreadystatechange';
-    var xDomain = false;
-
-    // For IE 8/9 CORS support
-    // Only supports POST and GET calls and doesn't returns the response headers.
-    // DON'T do this for testing b/c XMLHttpRequest is mocked, not XDomainRequest.
-    if (process.env.NODE_ENV !== 'test' &&
-        typeof window !== 'undefined' &&
-        window.XDomainRequest && !('withCredentials' in request) &&
-        !isURLSameOrigin(config.url)) {
-      request = new window.XDomainRequest();
-      loadEvent = 'onload';
-      xDomain = true;
-      request.onprogress = function handleProgress() {};
-      request.ontimeout = function handleTimeout() {};
-    }
 
     // HTTP basic authentication
     if (config.auth) {
@@ -4498,8 +4484,8 @@ module.exports = function xhrAdapter(config) {
     request.timeout = config.timeout;
 
     // Listen for ready state
-    request[loadEvent] = function handleLoad() {
-      if (!request || (request.readyState !== 4 && !xDomain)) {
+    request.onreadystatechange = function handleLoad() {
+      if (!request || request.readyState !== 4) {
         return;
       }
 
@@ -4516,9 +4502,8 @@ module.exports = function xhrAdapter(config) {
       var responseData = !config.responseType || config.responseType === 'text' ? request.responseText : request.response;
       var response = {
         data: responseData,
-        // IE sends 1223 instead of 204 (https://github.com/axios/axios/issues/201)
-        status: request.status === 1223 ? 204 : request.status,
-        statusText: request.status === 1223 ? 'No Content' : request.statusText,
+        status: request.status,
+        statusText: request.statusText,
         headers: responseHeaders,
         config: config,
         request: request
@@ -4629,8 +4614,7 @@ module.exports = function xhrAdapter(config) {
   });
 };
 
-}).call(this,_dereq_('_process'))
-},{"../core/createError":29,"./../core/settle":32,"./../helpers/btoa":36,"./../helpers/buildURL":37,"./../helpers/cookies":39,"./../helpers/isURLSameOrigin":41,"./../helpers/parseHeaders":43,"./../utils":45,"_process":218}],23:[function(_dereq_,module,exports){
+},{"../core/createError":29,"./../core/settle":32,"./../helpers/buildURL":36,"./../helpers/cookies":38,"./../helpers/isURLSameOrigin":40,"./../helpers/parseHeaders":42,"./../utils":44}],23:[function(_dereq_,module,exports){
 'use strict';
 
 var utils = _dereq_('./utils');
@@ -4684,7 +4668,7 @@ module.exports = axios;
 // Allow use of default import syntax in TypeScript
 module.exports.default = axios;
 
-},{"./cancel/Cancel":24,"./cancel/CancelToken":25,"./cancel/isCancel":26,"./core/Axios":27,"./defaults":34,"./helpers/bind":35,"./helpers/spread":44,"./utils":45}],24:[function(_dereq_,module,exports){
+},{"./cancel/Cancel":24,"./cancel/CancelToken":25,"./cancel/isCancel":26,"./core/Axios":27,"./defaults":34,"./helpers/bind":35,"./helpers/spread":43,"./utils":44}],24:[function(_dereq_,module,exports){
 'use strict';
 
 /**
@@ -4806,7 +4790,7 @@ Axios.prototype.request = function request(config) {
     }, arguments[1]);
   }
 
-  config = utils.merge(defaults, this.defaults, { method: 'get' }, config);
+  config = utils.merge(defaults, {method: 'get'}, this.defaults, config);
   config.method = config.method.toLowerCase();
 
   // Hook up interceptors middleware
@@ -4852,7 +4836,7 @@ utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
 
 module.exports = Axios;
 
-},{"./../defaults":34,"./../utils":45,"./InterceptorManager":28,"./dispatchRequest":30}],28:[function(_dereq_,module,exports){
+},{"./../defaults":34,"./../utils":44,"./InterceptorManager":28,"./dispatchRequest":30}],28:[function(_dereq_,module,exports){
 'use strict';
 
 var utils = _dereq_('./../utils');
@@ -4906,7 +4890,7 @@ InterceptorManager.prototype.forEach = function forEach(fn) {
 
 module.exports = InterceptorManager;
 
-},{"./../utils":45}],29:[function(_dereq_,module,exports){
+},{"./../utils":44}],29:[function(_dereq_,module,exports){
 'use strict';
 
 var enhanceError = _dereq_('./enhanceError');
@@ -5014,7 +4998,7 @@ module.exports = function dispatchRequest(config) {
   });
 };
 
-},{"../cancel/isCancel":26,"../defaults":34,"./../helpers/combineURLs":38,"./../helpers/isAbsoluteURL":40,"./../utils":45,"./transformData":33}],31:[function(_dereq_,module,exports){
+},{"../cancel/isCancel":26,"../defaults":34,"./../helpers/combineURLs":37,"./../helpers/isAbsoluteURL":39,"./../utils":44,"./transformData":33}],31:[function(_dereq_,module,exports){
 'use strict';
 
 /**
@@ -5087,7 +5071,7 @@ module.exports = function transformData(data, headers, fns) {
   return data;
 };
 
-},{"./../utils":45}],34:[function(_dereq_,module,exports){
+},{"./../utils":44}],34:[function(_dereq_,module,exports){
 (function (process){
 'use strict';
 
@@ -5154,6 +5138,10 @@ var defaults = {
     return data;
   }],
 
+  /**
+   * A timeout in milliseconds to abort a request. If set to 0 (default) a
+   * timeout is not created.
+   */
   timeout: 0,
 
   xsrfCookieName: 'XSRF-TOKEN',
@@ -5183,7 +5171,7 @@ utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
 module.exports = defaults;
 
 }).call(this,_dereq_('_process'))
-},{"./adapters/http":22,"./adapters/xhr":22,"./helpers/normalizeHeaderName":42,"./utils":45,"_process":218}],35:[function(_dereq_,module,exports){
+},{"./adapters/http":22,"./adapters/xhr":22,"./helpers/normalizeHeaderName":41,"./utils":44,"_process":218}],35:[function(_dereq_,module,exports){
 'use strict';
 
 module.exports = function bind(fn, thisArg) {
@@ -5197,44 +5185,6 @@ module.exports = function bind(fn, thisArg) {
 };
 
 },{}],36:[function(_dereq_,module,exports){
-'use strict';
-
-// btoa polyfill for IE<10 courtesy https://github.com/davidchambers/Base64.js
-
-var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-
-function E() {
-  this.message = 'String contains an invalid character';
-}
-E.prototype = new Error;
-E.prototype.code = 5;
-E.prototype.name = 'InvalidCharacterError';
-
-function btoa(input) {
-  var str = String(input);
-  var output = '';
-  for (
-    // initialize result and counter
-    var block, charCode, idx = 0, map = chars;
-    // if the next str index does not exist:
-    //   change the mapping table to "="
-    //   check if d has no fractional digits
-    str.charAt(idx | 0) || (map = '=', idx % 1);
-    // "8 - idx % 1 * 8" generates the sequence 2, 4, 6, 8
-    output += map.charAt(63 & block >> 8 - idx % 1 * 8)
-  ) {
-    charCode = str.charCodeAt(idx += 3 / 4);
-    if (charCode > 0xFF) {
-      throw new E();
-    }
-    block = block << 8 | charCode;
-  }
-  return output;
-}
-
-module.exports = btoa;
-
-},{}],37:[function(_dereq_,module,exports){
 'use strict';
 
 var utils = _dereq_('./../utils');
@@ -5278,9 +5228,7 @@ module.exports = function buildURL(url, params, paramsSerializer) {
 
       if (utils.isArray(val)) {
         key = key + '[]';
-      }
-
-      if (!utils.isArray(val)) {
+      } else {
         val = [val];
       }
 
@@ -5304,7 +5252,7 @@ module.exports = function buildURL(url, params, paramsSerializer) {
   return url;
 };
 
-},{"./../utils":45}],38:[function(_dereq_,module,exports){
+},{"./../utils":44}],37:[function(_dereq_,module,exports){
 'use strict';
 
 /**
@@ -5320,7 +5268,7 @@ module.exports = function combineURLs(baseURL, relativeURL) {
     : baseURL;
 };
 
-},{}],39:[function(_dereq_,module,exports){
+},{}],38:[function(_dereq_,module,exports){
 'use strict';
 
 var utils = _dereq_('./../utils');
@@ -5375,7 +5323,7 @@ module.exports = (
   })()
 );
 
-},{"./../utils":45}],40:[function(_dereq_,module,exports){
+},{"./../utils":44}],39:[function(_dereq_,module,exports){
 'use strict';
 
 /**
@@ -5391,7 +5339,7 @@ module.exports = function isAbsoluteURL(url) {
   return /^([a-z][a-z\d\+\-\.]*:)?\/\//i.test(url);
 };
 
-},{}],41:[function(_dereq_,module,exports){
+},{}],40:[function(_dereq_,module,exports){
 'use strict';
 
 var utils = _dereq_('./../utils');
@@ -5461,7 +5409,7 @@ module.exports = (
   })()
 );
 
-},{"./../utils":45}],42:[function(_dereq_,module,exports){
+},{"./../utils":44}],41:[function(_dereq_,module,exports){
 'use strict';
 
 var utils = _dereq_('../utils');
@@ -5475,7 +5423,7 @@ module.exports = function normalizeHeaderName(headers, normalizedName) {
   });
 };
 
-},{"../utils":45}],43:[function(_dereq_,module,exports){
+},{"../utils":44}],42:[function(_dereq_,module,exports){
 'use strict';
 
 var utils = _dereq_('./../utils');
@@ -5530,7 +5478,7 @@ module.exports = function parseHeaders(headers) {
   return parsed;
 };
 
-},{"./../utils":45}],44:[function(_dereq_,module,exports){
+},{"./../utils":44}],43:[function(_dereq_,module,exports){
 'use strict';
 
 /**
@@ -5559,7 +5507,7 @@ module.exports = function spread(callback) {
   };
 };
 
-},{}],45:[function(_dereq_,module,exports){
+},{}],44:[function(_dereq_,module,exports){
 'use strict';
 
 var bind = _dereq_('./helpers/bind');
@@ -5864,7 +5812,20 @@ module.exports = {
   trim: trim
 };
 
-},{"./helpers/bind":35,"is-buffer":188}],46:[function(_dereq_,module,exports){
+},{"./helpers/bind":35,"is-buffer":45}],45:[function(_dereq_,module,exports){
+/*!
+ * Determine if an object is a Buffer
+ *
+ * @author   Feross Aboukhadijeh <https://feross.org>
+ * @license  MIT
+ */
+
+module.exports = function isBuffer (obj) {
+  return obj != null && obj.constructor != null &&
+    typeof obj.constructor.isBuffer === 'function' && obj.constructor.isBuffer(obj)
+}
+
+},{}],46:[function(_dereq_,module,exports){
 'use strict'
 
 exports.byteLength = byteLength

@@ -86,81 +86,55 @@
      * @returns {promise|*} promise whether the attempt was successful or not
      */
     WebSocket.prototype.open = function open(host, user, password, authToken) {
-        var featureDef = Q.defer();
-        return _resolveHost(host).then(function (resHost) {
-            if (this._config.protocol === WebSocketConfig.protocol.WS) {
-                resHost = "http://" + resHost;
+        this._httpCom = new HttpRequest();
+        return this._resolveHost(host).then(function (resHost) {
+            Debug.Socket.Basic && console.log(this.name + "try to open WebSocket to host:", resHost);
+
+            this._tokenHandler = new TokenHandler(this, this._config.uniqueId, this._config.deviceInfo, function(tkObj) {
+                this._config.delegate.socketOnTokenRefresh && this._config.delegate.socketOnTokenRefresh(this, tkObj);
+            }.bind(this));
+            var encryptionAllowed = FeatureCheck.check(FeatureCheck.feature.TOKENS),
+                supportsTokens = FeatureCheck.check(FeatureCheck.feature.TOKENS);
+
+            this._hashAlg = FeatureCheck.check(FeatureCheck.feature.SHA_256) ? CryptoAdapter.HASH_ALGORITHM.SHA256 : CryptoAdapter.HASH_ALGORITHM.SHA1;
+
+            if (this._ws && this._ws.ws && !this._ws.socketClosed) {
+                console.warn(this.name + "===============================================================");
+                console.warn(this.name + "WARNING: WebSocket is maybe still opened! readyState:", this._ws.ws.readyState);
+                console.warn(this.name + " - we now open another new WebSocket..");
+                console.warn(this.name + " - old WebSocket will be closed..");
+                console.warn(this.name + "===============================================================");
+
+                this._ws.close(SupportCode.WEBSOCKET_MANUAL_CLOSE);
+            }
+
+            this._socketPromise = Q.defer();
+
+            this._wrongPassword = false;
+            this._invalidToken = false;
+
+            if (this._isDownloadSocket) {
+                this._ws = new WebSocketWrapper(resHost, this._config.protocol, true, true); // long timeout, no keepalive
             } else {
-                resHost = "https://" + resHost;
+                this._ws = new WebSocketWrapper(resHost, this._config.protocol);
             }
 
-            if (resHost.slice(-1) !== "/") {
-                resHost = resHost + "/";
-            }
-
-            this._httpCom = new HttpRequest();
-
-            if (!FeatureCheck.hasCurrentVersion()) {
-                Debug.Socket.Basic && console.info("No Version defined, requesting version for Feature checking");
-                this._httpCom.requestValue(resHost, Commands.GET_API_KEY).then(function succ(value) {
-                    FeatureCheck.setCurrentVersion(value.version);
-                    featureDef.resolve();
-                }, function(e) {
-                    featureDef.reject(e);
-                });
-            } else {
-                featureDef.resolve();
-            }
-
-            return featureDef.promise.then(function() {
-                Debug.Socket.Basic && console.log(this.name + "try to open WebSocket to host:", resHost);
-
-                this._tokenHandler = new TokenHandler(this, this._config.uniqueId, this._config.deviceInfo, function(tkObj) {
-                    this._config.delegate.socketOnTokenRefresh && this._config.delegate.socketOnTokenRefresh(this, tkObj);
-                }.bind(this));
-                var encryptionAllowed = FeatureCheck.check(FeatureCheck.feature.TOKENS),
-                    supportsTokens = FeatureCheck.check(FeatureCheck.feature.TOKENS);
-
-                this._hashAlg = FeatureCheck.check(FeatureCheck.feature.SHA_256) ? CryptoAdapter.HASH_ALGORITHM.SHA256 : CryptoAdapter.HASH_ALGORITHM.SHA1;
-
-                if (this._ws && this._ws.ws && !this._ws.socketClosed) {
-                    console.warn(this.name + "===============================================================");
-                    console.warn(this.name + "WARNING: WebSocket is maybe still opened! readyState:", this._ws.ws.readyState);
-                    console.warn(this.name + " - we now open another new WebSocket..");
-                    console.warn(this.name + " - old WebSocket will be closed..");
-                    console.warn(this.name + "===============================================================");
-
-                    this._ws.close(SupportCode.WEBSOCKET_MANUAL_CLOSE);
-                }
-
-                this._socketPromise = Q.defer();
-
-                this._wrongPassword = false;
-                this._invalidToken = false;
-
+            this._ws.onOpen = this.wsOpened.bind(this, resHost, user, password, encryptionAllowed, supportsTokens, authToken);
+            this._ws.onMessageError = this._messageErrorHandler.bind(this);
+            this._ws.onTextMessage = this._textMessageHandler.bind(this);
+            this._ws.onBinaryMessage = this._binaryMessageHandler.bind(this);
+            this._ws.onClose = this._closeHandler.bind(this);
+            this._ws.onError = this._errorHandler.bind(this);
+            this._ws.incomingDataProgress = function (progress) {
                 if (this._isDownloadSocket) {
-                    this._ws = new WebSocketWrapper(resHost, this._config.protocol, true, true); // long timeout, no keepalive
-                } else {
-                    this._ws = new WebSocketWrapper(resHost, this._config.protocol);
+                    this._config.delegate.socketOnDataProgress && this._config.delegate.socketOnDataProgress(this, progress);
                 }
+            }.bind(this);
 
-                this._ws.onOpen = this.wsOpened.bind(this, resHost, user, password, encryptionAllowed, supportsTokens, authToken);
-                this._ws.onMessageError = this._messageErrorHandler.bind(this);
-                this._ws.onTextMessage = this._textMessageHandler.bind(this);
-                this._ws.onBinaryMessage = this._binaryMessageHandler.bind(this);
-                this._ws.onClose = this._closeHandler.bind(this);
-                this._ws.onError = this._errorHandler.bind(this);
-                this._ws.incomingDataProgress = function (progress) {
-                    if (this._isDownloadSocket) {
-                        this._config.delegate.socketOnDataProgress && this._config.delegate.socketOnDataProgress(this, progress);
-                    }
-                }.bind(this);
-
-                return this._socketPromise.promise.then(function() {
-                    if (!this._isDownloadSocket) { // DLSocket has no keepalive
-                        this._ws.startKeepalive();
-                    }
-                }.bind(this));
+            return this._socketPromise.promise.then(function() {
+                if (!this._isDownloadSocket) { // DLSocket has no keepalive
+                    this._ws.startKeepalive();
+                }
             }.bind(this));
         }.bind(this));
     };
@@ -1042,47 +1016,73 @@
     };
 
     /**
-     * Resolves the external IP address from the Loxone CloudDNS if the URL is an Loxone CloudDNS URL
-     * The given URL is resolved if it isn't a CloudDNS URL
-     * @param url The address the Miniserver can be reached with
-     * @return {Promise}
+     * Resolves the given url to the the IP address of the Miniserver or to the HTTPS dyndns url of the Miniserver v2 if applicable
+     * @param url Can be internal or external IP, CloudDNS URL or Custom URL
      * @private
      */
-    var _resolveHost = function(url) {
-        var cloudDNSIndex,
-            isOldDNS,
+    WebSocket.prototype._resolveHost = function _resolveHost(url) {
+        var isOldDNS,
             isNewDNS,
-            serialNo;
-
-        url = url.replace("https://", "");
-        url = url.replace("http://", "");
-        return new Promise(function(resolve, reject) {
+            isLxCloudDNS= false,
             cloudDNSIndex = url.indexOf("dns.loxonecloud.com");
             isOldDNS = cloudDNSIndex === 0;    // Like dns.loxonecloud.com/{serialNo}
             isNewDNS = cloudDNSIndex === 13;    // Like {serialNo}.dns.loxonecloud.com
 
-            // Get the serial number out of the url
-            if (isOldDNS) {
-                serialNo = url.slice(20); // Get the serial number, which is located on the end of the url
-            } else if (isNewDNS) {
-                serialNo = url.slice(0, 12); // Ge the serial number, which is located on the beginning of the url
+        isLxCloudDNS = isOldDNS || isNewDNS;
+
+        if (!url.hasSuffix("/")) {
+            url += "/";
+        }
+
+        if (url.indexOf("http://") === -1 && url.indexOf("https://")) {
+            if (this._config.protocol === WebSocketConfig.protocol.WS) {
+                url = "http://" + url;
+            } else {
+                url = "https://" + url;
+            }
+        }
+
+        // The Loxone Cloud DNS only accepts the "http" protocol, it will automatically redirect to the "https" url if applicable
+        if (isLxCloudDNS) {
+            url = url.replace("https://", "http://");
+        }
+
+        return $.ajax({
+            url: url + Commands.GET_API_KEY,
+            dataType: "json"
+        }).then(function(result) {
+            var resolvedHost,
+                value;
+
+            // There is a difference on how to get the responseUrl in Node.js and in the Browser
+            if (result.request.res) {
+                resolvedHost = result.request.res.responseUrl;
+            } else {
+                resolvedHost = result.request.responseURL;
             }
 
-            if (serialNo) {
-                return $.ajax({
-                    url: "http://dns.loxonecloud.com/?getip&snr=" + serialNo + "&json=true",
-                    dataType: "json"
-                }).then(function(result) {
-                    // Node.js already parses the result, Javascript doesn't
-                    if (typeof result.data === "object") {
-                        resolve(result.data.IP);
-                    } else {
-                        resolve(JSON.parse(result.data).IP);
-                    }
-                }, reject);
+            resolvedHost = resolvedHost.replace(Commands.GET_API_KEY, "");
+
+            if (typeof result.data === "string") {
+                result.data = JSON.parse(result.data);
             }
-            resolve(url);
-        });
+
+            try {
+                value = JSON.parse(result.data.LL.value.replace(/\'/g, '"'));
+            } catch (ex) {
+                value = result.data.LL.value;
+            }
+
+            if (!FeatureCheck.hasCurrentVersion()) {
+                FeatureCheck.setCurrentVersion(value.version);
+            }
+            // Manually set the communication protocol according to the httpsStatus property of the response
+            if (isLxCloudDNS && value.httpsStatus === 1) {
+                this._config._protocol = WebSocketConfig.protocol.WSS;
+            }
+
+            return resolvedHost;
+        }.bind(this));
     };
 
     //////////////////////////////////////////////////////////////////////
