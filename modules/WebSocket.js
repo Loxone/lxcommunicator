@@ -1016,7 +1016,7 @@
     };
 
     /**
-     * Resolves the given url to the the IP address of the Miniserver or to the HTTPS dyndns url of the Miniserver v2 if applicable
+     * Resolves the given url to the the IP address of the Miniserver or to the HTTPS dyndns url of the Miniserver Generation 2 if applicable
      * @param url Can be internal or external IP, CloudDNS URL or Custom URL
      * @private
      */
@@ -1024,17 +1024,19 @@
         var isOldDNS,
             isNewDNS,
             isLxCloudDNS= false,
-            cloudDNSIndex = url.indexOf("dns.loxonecloud.com");
+            cloudDNSIndex = url.replace(/^http[s]*:\/\//).indexOf("dns.loxonecloud.com");
             isOldDNS = cloudDNSIndex === 0;    // Like dns.loxonecloud.com/{serialNo}
             isNewDNS = cloudDNSIndex === 13;    // Like {serialNo}.dns.loxonecloud.com
 
         isLxCloudDNS = isOldDNS || isNewDNS;
 
+        // Add a trailing slash if missing for later command concatenation
         if (!url.hasSuffix("/")) {
             url += "/";
         }
 
-        if (url.indexOf("http://") === -1 && url.indexOf("https://")) {
+        // Ensure the URL contains a protocol
+        if (url.indexOf("http://") === -1 && url.indexOf("https://") === -1) {
             if (this._config.protocol === WebSocketConfig.protocol.WS) {
                 url = "http://" + url;
             } else {
@@ -1054,6 +1056,7 @@
             var resolvedHost,
                 value;
 
+            // Follow Redirect
             // There is a difference on how to get the responseUrl in Node.js and in the Browser
             if (result.request.res) {
                 resolvedHost = result.request.res.responseUrl;
