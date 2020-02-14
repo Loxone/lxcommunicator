@@ -409,7 +409,9 @@
 
     var $ = _dereq_('../vendor/JqueryWrapper'),
         CryptoJS = _dereq_('crypto-js'),
+        CryptoAdapter = _dereq_('../vendor/CryptoAdapter'),
         JSEncryptWrapper = _dereq_('node-jsencrypt'),
+        FeatureCheck = _dereq_('../vendor/FeatureCheck'),
         Commands = _dereq_('../vendor/Commands'),
         DEBUG = _dereq_('../vendor/Debug').HttpRequest;
 
@@ -486,17 +488,19 @@
             },
 
             /**
-             * Will launch an authentication request based on the username and password provided. The credetnials will be hashed
+             * Will launch an authentication request based on the username and password provided. The credentials will be hashed
              * using the otSalt provided. The request will NOT be encrypted.
              * @param url
              * @param username
              * @param password
-             * @param otSalt    the onetime salt to use for authenticating
+             * @param otSalt            the onetime salt to use for authenticating
+             * @param currentMsVersion
              * @returns {*}
              */
-            authViaPassword: function authViaPassword(url, username, password, otSalt) {
-                var authData = {
-                    auth: CryptoJS.HmacSHA1(username + ":" + password, this._hexToString(otSalt)).toString(),
+            authViaPassword: function authViaPassword(url, username, password, otSalt, currentMsVersion) {
+                var hashAlg = FeatureCheck.check(FeatureCheck.feature.SHA_256, currentMsVersion) ? CryptoAdapter.HASH_ALGORITHM.SHA256 : CryptoAdapter.HASH_ALGORITHM.SHA1,
+                    authData = {
+                    auth: CryptoAdapter["Hmac" + hashAlg](username + ":" + password, "utf8", otSalt, "hex", "hex"),
                     user: username
                 };
                 return this.request(url, Commands.STRUCTURE_FILE_DATE, authData);
@@ -543,11 +547,11 @@
 
                 return this._requestTokenSalts(url, username).then(function(saltObj) {
                     // create a SHA1 hash of the (salted) password
-                    pwHash = CryptoJS.SHA1(password + ":" + saltObj.salt).toString();
+                    pwHash = CryptoAdapter[saltObj.hashAlg](password + ":" + saltObj.salt).toString();
                     pwHash = pwHash.toUpperCase();
 
                     // hash with user and otSalt
-                    hash = this._otHash(username + ":" + pwHash, saltObj.oneTimeSalt);
+                    hash = this._otHash(username + ":" + pwHash, saltObj.oneTimeSalt, saltObj.hashAlg);
 
                     // build up the token command
                     cmd = this._getTokenCmd(hash, username, type, deviceUuid, deviceInfo);
@@ -565,15 +569,13 @@
              * Will create a oneTime hash of the payload using the salt provided
              * @param payload
              * @param otSalt
+             * @param hashAlg
              * @returns {string}
              * @private
              */
-            _otHash: function _otHash(payload, otSalt) {
-                var msg = CryptoJS.enc.Utf8.parse(payload);
-                var k = CryptoJS.enc.Hex.parse(otSalt);
-                var hash = CryptoJS.HmacSHA1(msg, k);
-
-                return hash.toString(CryptoJS.enc.Hex);
+            _otHash: function _otHash(payload, otSalt, hashAlg) {
+                hashAlg = hashAlg || CryptoAdapter.HASH_ALGORITHM.SHA1;
+                return CryptoAdapter["Hmac" + hashAlg](payload, "utf8", otSalt, "hex", "hex");
             },
 
             /**
@@ -601,7 +603,8 @@
                 return this.lxEncRequestValue(url, cmd).then(function(result) {
                     return {
                         oneTimeSalt: result.key,
-                        salt: result.salt
+                        salt: result.salt,
+                        hashAlg: result.hashAlg || CryptoAdapter.HASH_ALGORITHM.SHA1
                     };
                 });
             },
@@ -822,7 +825,7 @@
 
 }).call(this);
 
-},{"../vendor/Commands":262,"../vendor/Debug":265,"../vendor/JqueryWrapper":269,"crypto-js":97,"node-jsencrypt":200}],4:[function(_dereq_,module,exports){
+},{"../vendor/Commands":262,"../vendor/CryptoAdapter":263,"../vendor/Debug":265,"../vendor/FeatureCheck":268,"../vendor/JqueryWrapper":269,"crypto-js":97,"node-jsencrypt":200}],4:[function(_dereq_,module,exports){
 (function() {
     var MAX_REFRESH_DELAY = 1000 * 60 * 60 * 24;    // = 1 Day
 
@@ -865,12 +868,12 @@
 
                 return this._requestUserSalt(user).then(function(saltObj) {
 
-                    // create a SHA1 hash of the (salted) password
-                    pwHash = CryptoAdapter.SHA1(password + ":" + saltObj.salt);
+                    // create a SHA1 or SHA256 hash of the (salted) password
+                    pwHash = CryptoAdapter[saltObj.hashAlg](password + ":" + saltObj.salt);
                     pwHash = pwHash.toUpperCase();
 
                     // hash with user and otSalt
-                    hash = this._otHash(user + ":" + pwHash, saltObj.oneTimeSalt);
+                    hash = this._otHash(user + ":" + pwHash, saltObj.oneTimeSalt, saltObj.hashAlg);
 
                     // create the getToken cmd
                     cmd = Commands.format(this._getGetTokenCommand(), hash, user, msPermission, deviceId, deviceInfo);
@@ -1256,20 +1259,23 @@
                 return communicatorModule.send(cmd, EncryptionType.REQUEST_RESPONSE_VAL).then(function(result) {
                     return {
                         oneTimeSalt: result.LL.value.key,
-                        salt: result.LL.value.salt
+                        salt: result.LL.value.salt,
+                        hashAlg: result.LL.value.hashAlg || CryptoAdapter.HASH_ALGORITHM.SHA1
                     };
                 });
             },
 
             /**
-             * Helper method that will create a oneTimeHash (HmacSHA1) of the payload using the oneTimeSalt provided.
+             * Helper method that will create a oneTimeHash (HmacSHA1 or HmacSHA256) of the payload using the oneTimeSalt provided.
              * @param payload       the payload to hash
-             * @param oneTimeSalt   the onetime salt to use for the HmacSHA1
+             * @param oneTimeSalt   the onetime salt to use for the HmacSHA1 or HmacSHA256
+             * @param [hashAlg]     the hashing algorithm to be used
              * @returns {string|*}
              * @private
              */
-            _otHash: function _otHash(payload, oneTimeSalt) {
-                return CryptoAdapter.HmacSHA1(payload, "utf8", oneTimeSalt, "hex", "hex");
+            _otHash: function _otHash(payload, oneTimeSalt, hashAlg) {
+                hashAlg = hashAlg || CryptoAdapter.HASH_ALGORITHM.SHA1;
+                return CryptoAdapter["Hmac" + hashAlg](payload, "utf8", oneTimeSalt, "hex", "hex");
             },
 
             /**
@@ -1493,7 +1499,7 @@
              * @private
              */
             _getGetTokenCommand: function _getGetTokenCommand() {
-                return FeatureCheck.check(FeatureCheck.Feature.JWT_SUPPORT) ? Commands.TOKEN.GET_JWT_TOKEN : Commands.TOKEN.GET_TOKEN;
+                return FeatureCheck.check(FeatureCheck.feature.JWT_SUPPORT) ? Commands.TOKEN.GET_JWT_TOKEN : Commands.TOKEN.GET_TOKEN;
             },
 
             /**
@@ -1502,7 +1508,7 @@
              * @private
              */
             _getRefreshCommand: function _getRefreshCommand() {
-                return FeatureCheck.check(FeatureCheck.Feature.JWT_SUPPORT)  ? Commands.TOKEN.REFRESH : Commands.TOKEN.REFRESH_JWT;
+                return FeatureCheck.check(FeatureCheck.feature.JWT_SUPPORT)  ? Commands.TOKEN.REFRESH_JWT : Commands.TOKEN.REFRESH;
             }
         }
     };
@@ -1586,7 +1592,8 @@
             salt: null, // current salt, must alternate with each encrypted command
             key: null,  // AES key for the current session
             iv: null    // AES iv
-        }
+        };
+        this._hashAlg = CryptoAdapter.HASH_ALGORITHM.SHA1;
     }
 
 
@@ -1600,79 +1607,55 @@
      * @returns {promise|*} promise whether the attempt was successful or not
      */
     WebSocket.prototype.open = function open(host, user, password, authToken) {
-        var featureDef = Q.defer();
-        return _resolveHost(host).then(function (resHost) {
-            if (this._config.protocol === WebSocketConfig.protocol.WS) {
-                resHost = "http://" + resHost;
+        this._httpCom = new HttpRequest();
+        return this._resolveHost(host).then(function (resHost) {
+            Debug.Socket.Basic && console.log(this.name + "try to open WebSocket to host:", resHost);
+
+            this._tokenHandler = new TokenHandler(this, this._config.uniqueId, this._config.deviceInfo, function(tkObj) {
+                this._config.delegate.socketOnTokenRefresh && this._config.delegate.socketOnTokenRefresh(this, tkObj);
+            }.bind(this));
+            var encryptionAllowed = FeatureCheck.check(FeatureCheck.feature.TOKENS),
+                supportsTokens = FeatureCheck.check(FeatureCheck.feature.TOKENS);
+
+            this._hashAlg = FeatureCheck.check(FeatureCheck.feature.SHA_256) ? CryptoAdapter.HASH_ALGORITHM.SHA256 : CryptoAdapter.HASH_ALGORITHM.SHA1;
+
+            if (this._ws && this._ws.ws && !this._ws.socketClosed) {
+                console.warn(this.name + "===============================================================");
+                console.warn(this.name + "WARNING: WebSocket is maybe still opened! readyState:", this._ws.ws.readyState);
+                console.warn(this.name + " - we now open another new WebSocket..");
+                console.warn(this.name + " - old WebSocket will be closed..");
+                console.warn(this.name + "===============================================================");
+
+                this._ws.close(SupportCode.WEBSOCKET_MANUAL_CLOSE);
+            }
+
+            this._socketPromise = Q.defer();
+
+            this._wrongPassword = false;
+            this._invalidToken = false;
+
+            if (this._isDownloadSocket) {
+                this._ws = new WebSocketWrapper(resHost, this._config.protocol, true, true); // long timeout, no keepalive
             } else {
-                resHost = "https://" + resHost;
+                this._ws = new WebSocketWrapper(resHost, this._config.protocol);
             }
 
-            if (resHost.slice(-1) !== "/") {
-                resHost = resHost + "/";
-            }
-
-            this._httpCom = new HttpRequest();
-
-            if (!FeatureCheck.hasCurrentVersion()) {
-                Debug.Socket.Basic && console.info("No Version defined, requesting version for Feature checking");
-                this._httpCom.requestValue(resHost, Commands.GET_API_KEY).then(function succ(value) {
-                    FeatureCheck.setCurrentVersion(value.version);
-                    featureDef.resolve();
-                }, function(e) {
-                    featureDef.reject(e);
-                });
-            } else {
-                featureDef.resolve();
-            }
-
-            return featureDef.promise.then(function() {
-                Debug.Socket.Basic && console.log(this.name + "try to open WebSocket to host:", resHost);
-
-                this._tokenHandler = new TokenHandler(this, this._config.uniqueId, this._config.deviceInfo, function(tkObj) {
-                    this._config.delegate.socketOnTokenRefresh && this._config.delegate.socketOnTokenRefresh(this, tkObj);
-                }.bind(this));
-                var encryptionAllowed = FeatureCheck.check(FeatureCheck.feature.TOKENS),
-                    supportsTokens = FeatureCheck.check(FeatureCheck.feature.TOKENS);
-
-                if (this._ws && this._ws.ws && !this._ws.socketClosed) {
-                    console.warn(this.name + "===============================================================");
-                    console.warn(this.name + "WARNING: WebSocket is maybe still opened! readyState:", this._ws.ws.readyState);
-                    console.warn(this.name + " - we now open another new WebSocket..");
-                    console.warn(this.name + " - old WebSocket will be closed..");
-                    console.warn(this.name + "===============================================================");
-
-                    this._ws.close(SupportCode.WEBSOCKET_MANUAL_CLOSE);
-                }
-
-                this._socketPromise = Q.defer();
-
-                this._wrongPassword = false;
-                this._invalidToken = false;
-
+            this._ws.onOpen = this.wsOpened.bind(this, resHost, user, password, encryptionAllowed, supportsTokens, authToken);
+            this._ws.onMessageError = this._messageErrorHandler.bind(this);
+            this._ws.onTextMessage = this._textMessageHandler.bind(this);
+            this._ws.onBinaryMessage = this._binaryMessageHandler.bind(this);
+            this._ws.onClose = this._closeHandler.bind(this);
+            this._ws.onError = this._errorHandler.bind(this);
+            this._ws.incomingDataProgress = function (progress) {
                 if (this._isDownloadSocket) {
-                    this._ws = new WebSocketWrapper(resHost, this._config.protocol, true, true); // long timeout, no keepalive
-                } else {
-                    this._ws = new WebSocketWrapper(resHost, this._config.protocol);
+                    this._config.delegate.socketOnDataProgress && this._config.delegate.socketOnDataProgress(this, progress);
                 }
+            }.bind(this);
 
-                this._ws.onOpen = this.wsOpened.bind(this, resHost, user, password, encryptionAllowed, supportsTokens, authToken);
-                this._ws.onMessageError = this._messageErrorHandler.bind(this);
-                this._ws.onTextMessage = this._textMessageHandler.bind(this);
-                this._ws.onBinaryMessage = this._binaryMessageHandler.bind(this);
-                this._ws.onClose = this._closeHandler.bind(this);
-                this._ws.onError = this._errorHandler.bind(this);
-                this._ws.incomingDataProgress = function (progress) {
-                    if (this._isDownloadSocket) {
-                        this._config.delegate.socketOnDataProgress && this._config.delegate.socketOnDataProgress(this, progress);
-                    }
-                }.bind(this);
-
-                return this._socketPromise.promise.then(function() {
-                    if (!this._isDownloadSocket) { // DLSocket has no keepalive
-                        this._ws.startKeepalive();
-                    }
-                }.bind(this));
+            return this._socketPromise.promise.then(function() {
+                if (!this._isDownloadSocket) { // DLSocket has no keepalive
+                    this._ws.startKeepalive();
+                }
             }.bind(this));
         }.bind(this));
     };
@@ -1748,7 +1731,7 @@
 
     WebSocket.prototype._authenticate = function _authenticate(user, password, oneTimeSalt, encrypted) {
         var creds = user + ":" + password,
-            hash = CryptoAdapter.HmacSHA1(creds, "utf8", oneTimeSalt, "hex", "hex"),
+            hash = CryptoAdapter["Hmac" + this._hashAlg](creds, "utf8", oneTimeSalt, "hex", "hex"),
             cmd;
 
         // starting pw based authentication.
@@ -1779,7 +1762,7 @@
     };
 
     /**
-     * Will create a HMAC-SHA1 hash based on the token and the oneTimeSalt provided & send it to
+     * Will create a HmacSHA1 or HmacSHA256 hash based on the token and the oneTimeSalt provided & send it to
      * the Miniserver in an authentication request.
      * @param user          the user for which the authentication request is made
      * @param token         the authentication token for this user
@@ -1788,7 +1771,7 @@
      */
     WebSocket.prototype._authWithToken = function _authWithToken(user, token, permission, oneTimeSalt) {
         Debug.Socket.Basic && console.log("WebSocket", "authenticate with token");
-        var hash = CryptoAdapter.HmacSHA1(token, "utf8", oneTimeSalt, "hex", "hex"),
+        var hash = CryptoAdapter["Hmac" + this._hashAlg](token, "utf8", oneTimeSalt, "hex", "hex"),
             cmd = Commands.format(Commands.TOKEN.AUTHENTICATE, hash, user),
             response;
 
@@ -1857,8 +1840,8 @@
         var encryptionType = FeatureCheck.check(FeatureCheck.feature.ENCRYPTED_CONNECTION_FULLY) ? EncryptionType.REQUEST_RESPONSE_VAL : EncryptionType.NONE;
         return this.send(Commands.GET_KEY, encryptionType).then(function(res) {
             var oneTimeSalt = getLxResponseValue(res, true);
-            return CryptoAdapter.HmacSHA1(payload, "utf8", oneTimeSalt, "hex", "hex");
-        });
+            return CryptoAdapter["Hmac" + this._hashAlg](payload, "utf8", oneTimeSalt, "hex", "hex");
+        }.bind(this));
     };
 
     /**
@@ -2554,47 +2537,73 @@
     };
 
     /**
-     * Resolves the external IP address from the Loxone CloudDNS if the URL is an Loxone CloudDNS URL
-     * The given URL is resolved if it isn't a CloudDNS URL
-     * @param url The address the Miniserver can be reached with
-     * @return {Promise}
+     * Resolves the given url to the the IP address of the Miniserver or to the HTTPS dyndns url of the Miniserver v2 if applicable
+     * @param url Can be internal or external IP, CloudDNS URL or Custom URL
      * @private
      */
-    var _resolveHost = function(url) {
-        var cloudDNSIndex,
-            isOldDNS,
+    WebSocket.prototype._resolveHost = function _resolveHost(url) {
+        var isOldDNS,
             isNewDNS,
-            serialNo;
-
-        url = url.replace("https://", "");
-        url = url.replace("http://", "");
-        return new Promise(function(resolve, reject) {
+            isLxCloudDNS= false,
             cloudDNSIndex = url.indexOf("dns.loxonecloud.com");
             isOldDNS = cloudDNSIndex === 0;    // Like dns.loxonecloud.com/{serialNo}
             isNewDNS = cloudDNSIndex === 13;    // Like {serialNo}.dns.loxonecloud.com
 
-            // Get the serial number out of the url
-            if (isOldDNS) {
-                serialNo = url.slice(20); // Get the serial number, which is located on the end of the url
-            } else if (isNewDNS) {
-                serialNo = url.slice(0, 12); // Ge the serial number, which is located on the beginning of the url
+        isLxCloudDNS = isOldDNS || isNewDNS;
+
+        if (!url.hasSuffix("/")) {
+            url += "/";
+        }
+
+        if (url.indexOf("http://") === -1 && url.indexOf("https://")) {
+            if (this._config.protocol === WebSocketConfig.protocol.WS) {
+                url = "http://" + url;
+            } else {
+                url = "https://" + url;
+            }
+        }
+
+        // The Loxone Cloud DNS only accepts the "http" protocol, it will automatically redirect to the "https" url if applicable
+        if (isLxCloudDNS) {
+            url = url.replace("https://", "http://");
+        }
+
+        return $.ajax({
+            url: url + Commands.GET_API_KEY,
+            dataType: "json"
+        }).then(function(result) {
+            var resolvedHost,
+                value;
+
+            // There is a difference on how to get the responseUrl in Node.js and in the Browser
+            if (result.request.res) {
+                resolvedHost = result.request.res.responseUrl;
+            } else {
+                resolvedHost = result.request.responseURL;
             }
 
-            if (serialNo) {
-                return $.ajax({
-                    url: "http://dns.loxonecloud.com/?getip&snr=" + serialNo + "&json=true",
-                    dataType: "json"
-                }).then(function(result) {
-                    // Node.js already parses the result, Javascript doesn't
-                    if (typeof result.data === "object") {
-                        resolve(result.data.IP);
-                    } else {
-                        resolve(JSON.parse(result.data).IP);
-                    }
-                }, reject);
+            resolvedHost = resolvedHost.replace(Commands.GET_API_KEY, "");
+
+            if (typeof result.data === "string") {
+                result.data = JSON.parse(result.data);
             }
-            resolve(url);
-        });
+
+            try {
+                value = JSON.parse(result.data.LL.value.replace(/\'/g, '"'));
+            } catch (ex) {
+                value = result.data.LL.value;
+            }
+
+            if (!FeatureCheck.hasCurrentVersion()) {
+                FeatureCheck.setCurrentVersion(value.version);
+            }
+            // Manually set the communication protocol according to the httpsStatus property of the response
+            if (isLxCloudDNS && value.httpsStatus === 1) {
+                this._config._protocol = WebSocketConfig.protocol.WSS;
+            }
+
+            return resolvedHost;
+        }.bind(this));
     };
 
     //////////////////////////////////////////////////////////////////////
@@ -2616,6 +2625,10 @@
      */
     function WebSocketConfig(protocol, uniqueId, deviceInfo, requiredPermission, isDownloadSocket) {
         this._delegate = {};
+        if (Object.values(WebSocketConfig.protocol).indexOf(protocol) === -1) {
+            console.warn(this.name, "Unknown protocol '" + protocol + "' using '" + WebSocketConfig.protocol.WS + "' instead!");
+            protocol = WebSocketConfig.protocol.WS;
+        }
         this._protocol = protocol;
         this._uniqueId = uniqueId;
         this._deviceInfo = deviceInfo;
@@ -4438,7 +4451,6 @@ PEMEncoder.prototype.encode = function encode(data, options) {
 },{"./der":18,"inherits":187}],21:[function(_dereq_,module,exports){
 module.exports = _dereq_('./lib/axios');
 },{"./lib/axios":23}],22:[function(_dereq_,module,exports){
-(function (process){
 'use strict';
 
 var utils = _dereq_('./../utils');
@@ -4447,7 +4459,6 @@ var buildURL = _dereq_('./../helpers/buildURL');
 var parseHeaders = _dereq_('./../helpers/parseHeaders');
 var isURLSameOrigin = _dereq_('./../helpers/isURLSameOrigin');
 var createError = _dereq_('../core/createError');
-var btoa = (typeof window !== 'undefined' && window.btoa && window.btoa.bind(window)) || _dereq_('./../helpers/btoa');
 
 module.exports = function xhrAdapter(config) {
   return new Promise(function dispatchXhrRequest(resolve, reject) {
@@ -4459,22 +4470,6 @@ module.exports = function xhrAdapter(config) {
     }
 
     var request = new XMLHttpRequest();
-    var loadEvent = 'onreadystatechange';
-    var xDomain = false;
-
-    // For IE 8/9 CORS support
-    // Only supports POST and GET calls and doesn't returns the response headers.
-    // DON'T do this for testing b/c XMLHttpRequest is mocked, not XDomainRequest.
-    if (process.env.NODE_ENV !== 'test' &&
-        typeof window !== 'undefined' &&
-        window.XDomainRequest && !('withCredentials' in request) &&
-        !isURLSameOrigin(config.url)) {
-      request = new window.XDomainRequest();
-      loadEvent = 'onload';
-      xDomain = true;
-      request.onprogress = function handleProgress() {};
-      request.ontimeout = function handleTimeout() {};
-    }
 
     // HTTP basic authentication
     if (config.auth) {
@@ -4489,8 +4484,8 @@ module.exports = function xhrAdapter(config) {
     request.timeout = config.timeout;
 
     // Listen for ready state
-    request[loadEvent] = function handleLoad() {
-      if (!request || (request.readyState !== 4 && !xDomain)) {
+    request.onreadystatechange = function handleLoad() {
+      if (!request || request.readyState !== 4) {
         return;
       }
 
@@ -4507,9 +4502,8 @@ module.exports = function xhrAdapter(config) {
       var responseData = !config.responseType || config.responseType === 'text' ? request.responseText : request.response;
       var response = {
         data: responseData,
-        // IE sends 1223 instead of 204 (https://github.com/axios/axios/issues/201)
-        status: request.status === 1223 ? 204 : request.status,
-        statusText: request.status === 1223 ? 'No Content' : request.statusText,
+        status: request.status,
+        statusText: request.statusText,
         headers: responseHeaders,
         config: config,
         request: request
@@ -4620,8 +4614,7 @@ module.exports = function xhrAdapter(config) {
   });
 };
 
-}).call(this,_dereq_('_process'))
-},{"../core/createError":29,"./../core/settle":32,"./../helpers/btoa":36,"./../helpers/buildURL":37,"./../helpers/cookies":39,"./../helpers/isURLSameOrigin":41,"./../helpers/parseHeaders":43,"./../utils":45,"_process":218}],23:[function(_dereq_,module,exports){
+},{"../core/createError":29,"./../core/settle":32,"./../helpers/buildURL":36,"./../helpers/cookies":38,"./../helpers/isURLSameOrigin":40,"./../helpers/parseHeaders":42,"./../utils":44}],23:[function(_dereq_,module,exports){
 'use strict';
 
 var utils = _dereq_('./utils');
@@ -4675,7 +4668,7 @@ module.exports = axios;
 // Allow use of default import syntax in TypeScript
 module.exports.default = axios;
 
-},{"./cancel/Cancel":24,"./cancel/CancelToken":25,"./cancel/isCancel":26,"./core/Axios":27,"./defaults":34,"./helpers/bind":35,"./helpers/spread":44,"./utils":45}],24:[function(_dereq_,module,exports){
+},{"./cancel/Cancel":24,"./cancel/CancelToken":25,"./cancel/isCancel":26,"./core/Axios":27,"./defaults":34,"./helpers/bind":35,"./helpers/spread":43,"./utils":44}],24:[function(_dereq_,module,exports){
 'use strict';
 
 /**
@@ -4797,7 +4790,7 @@ Axios.prototype.request = function request(config) {
     }, arguments[1]);
   }
 
-  config = utils.merge(defaults, this.defaults, { method: 'get' }, config);
+  config = utils.merge(defaults, {method: 'get'}, this.defaults, config);
   config.method = config.method.toLowerCase();
 
   // Hook up interceptors middleware
@@ -4843,7 +4836,7 @@ utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
 
 module.exports = Axios;
 
-},{"./../defaults":34,"./../utils":45,"./InterceptorManager":28,"./dispatchRequest":30}],28:[function(_dereq_,module,exports){
+},{"./../defaults":34,"./../utils":44,"./InterceptorManager":28,"./dispatchRequest":30}],28:[function(_dereq_,module,exports){
 'use strict';
 
 var utils = _dereq_('./../utils');
@@ -4897,7 +4890,7 @@ InterceptorManager.prototype.forEach = function forEach(fn) {
 
 module.exports = InterceptorManager;
 
-},{"./../utils":45}],29:[function(_dereq_,module,exports){
+},{"./../utils":44}],29:[function(_dereq_,module,exports){
 'use strict';
 
 var enhanceError = _dereq_('./enhanceError');
@@ -5005,7 +4998,7 @@ module.exports = function dispatchRequest(config) {
   });
 };
 
-},{"../cancel/isCancel":26,"../defaults":34,"./../helpers/combineURLs":38,"./../helpers/isAbsoluteURL":40,"./../utils":45,"./transformData":33}],31:[function(_dereq_,module,exports){
+},{"../cancel/isCancel":26,"../defaults":34,"./../helpers/combineURLs":37,"./../helpers/isAbsoluteURL":39,"./../utils":44,"./transformData":33}],31:[function(_dereq_,module,exports){
 'use strict';
 
 /**
@@ -5078,7 +5071,7 @@ module.exports = function transformData(data, headers, fns) {
   return data;
 };
 
-},{"./../utils":45}],34:[function(_dereq_,module,exports){
+},{"./../utils":44}],34:[function(_dereq_,module,exports){
 (function (process){
 'use strict';
 
@@ -5145,6 +5138,10 @@ var defaults = {
     return data;
   }],
 
+  /**
+   * A timeout in milliseconds to abort a request. If set to 0 (default) a
+   * timeout is not created.
+   */
   timeout: 0,
 
   xsrfCookieName: 'XSRF-TOKEN',
@@ -5174,7 +5171,7 @@ utils.forEach(['post', 'put', 'patch'], function forEachMethodWithData(method) {
 module.exports = defaults;
 
 }).call(this,_dereq_('_process'))
-},{"./adapters/http":22,"./adapters/xhr":22,"./helpers/normalizeHeaderName":42,"./utils":45,"_process":218}],35:[function(_dereq_,module,exports){
+},{"./adapters/http":22,"./adapters/xhr":22,"./helpers/normalizeHeaderName":41,"./utils":44,"_process":218}],35:[function(_dereq_,module,exports){
 'use strict';
 
 module.exports = function bind(fn, thisArg) {
@@ -5188,44 +5185,6 @@ module.exports = function bind(fn, thisArg) {
 };
 
 },{}],36:[function(_dereq_,module,exports){
-'use strict';
-
-// btoa polyfill for IE<10 courtesy https://github.com/davidchambers/Base64.js
-
-var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
-
-function E() {
-  this.message = 'String contains an invalid character';
-}
-E.prototype = new Error;
-E.prototype.code = 5;
-E.prototype.name = 'InvalidCharacterError';
-
-function btoa(input) {
-  var str = String(input);
-  var output = '';
-  for (
-    // initialize result and counter
-    var block, charCode, idx = 0, map = chars;
-    // if the next str index does not exist:
-    //   change the mapping table to "="
-    //   check if d has no fractional digits
-    str.charAt(idx | 0) || (map = '=', idx % 1);
-    // "8 - idx % 1 * 8" generates the sequence 2, 4, 6, 8
-    output += map.charAt(63 & block >> 8 - idx % 1 * 8)
-  ) {
-    charCode = str.charCodeAt(idx += 3 / 4);
-    if (charCode > 0xFF) {
-      throw new E();
-    }
-    block = block << 8 | charCode;
-  }
-  return output;
-}
-
-module.exports = btoa;
-
-},{}],37:[function(_dereq_,module,exports){
 'use strict';
 
 var utils = _dereq_('./../utils');
@@ -5269,9 +5228,7 @@ module.exports = function buildURL(url, params, paramsSerializer) {
 
       if (utils.isArray(val)) {
         key = key + '[]';
-      }
-
-      if (!utils.isArray(val)) {
+      } else {
         val = [val];
       }
 
@@ -5295,7 +5252,7 @@ module.exports = function buildURL(url, params, paramsSerializer) {
   return url;
 };
 
-},{"./../utils":45}],38:[function(_dereq_,module,exports){
+},{"./../utils":44}],37:[function(_dereq_,module,exports){
 'use strict';
 
 /**
@@ -5311,7 +5268,7 @@ module.exports = function combineURLs(baseURL, relativeURL) {
     : baseURL;
 };
 
-},{}],39:[function(_dereq_,module,exports){
+},{}],38:[function(_dereq_,module,exports){
 'use strict';
 
 var utils = _dereq_('./../utils');
@@ -5366,7 +5323,7 @@ module.exports = (
   })()
 );
 
-},{"./../utils":45}],40:[function(_dereq_,module,exports){
+},{"./../utils":44}],39:[function(_dereq_,module,exports){
 'use strict';
 
 /**
@@ -5382,7 +5339,7 @@ module.exports = function isAbsoluteURL(url) {
   return /^([a-z][a-z\d\+\-\.]*:)?\/\//i.test(url);
 };
 
-},{}],41:[function(_dereq_,module,exports){
+},{}],40:[function(_dereq_,module,exports){
 'use strict';
 
 var utils = _dereq_('./../utils');
@@ -5452,7 +5409,7 @@ module.exports = (
   })()
 );
 
-},{"./../utils":45}],42:[function(_dereq_,module,exports){
+},{"./../utils":44}],41:[function(_dereq_,module,exports){
 'use strict';
 
 var utils = _dereq_('../utils');
@@ -5466,7 +5423,7 @@ module.exports = function normalizeHeaderName(headers, normalizedName) {
   });
 };
 
-},{"../utils":45}],43:[function(_dereq_,module,exports){
+},{"../utils":44}],42:[function(_dereq_,module,exports){
 'use strict';
 
 var utils = _dereq_('./../utils');
@@ -5521,7 +5478,7 @@ module.exports = function parseHeaders(headers) {
   return parsed;
 };
 
-},{"./../utils":45}],44:[function(_dereq_,module,exports){
+},{"./../utils":44}],43:[function(_dereq_,module,exports){
 'use strict';
 
 /**
@@ -5550,7 +5507,7 @@ module.exports = function spread(callback) {
   };
 };
 
-},{}],45:[function(_dereq_,module,exports){
+},{}],44:[function(_dereq_,module,exports){
 'use strict';
 
 var bind = _dereq_('./helpers/bind');
@@ -5855,7 +5812,20 @@ module.exports = {
   trim: trim
 };
 
-},{"./helpers/bind":35,"is-buffer":188}],46:[function(_dereq_,module,exports){
+},{"./helpers/bind":35,"is-buffer":45}],45:[function(_dereq_,module,exports){
+/*!
+ * Determine if an object is a Buffer
+ *
+ * @author   Feross Aboukhadijeh <https://feross.org>
+ * @license  MIT
+ */
+
+module.exports = function isBuffer (obj) {
+  return obj != null && obj.constructor != null &&
+    typeof obj.constructor.isBuffer === 'function' && obj.constructor.isBuffer(obj)
+}
+
+},{}],46:[function(_dereq_,module,exports){
 'use strict'
 
 exports.byteLength = byteLength
@@ -25348,30 +25318,35 @@ utils.intFromLE = intFromLE;
 
 },{"bn.js":47,"minimalistic-assert":197,"minimalistic-crypto-utils":198}],149:[function(_dereq_,module,exports){
 module.exports={
-  "_from": "elliptic@^6.0.0",
+  "_args": [
+    [
+      "elliptic@6.4.1",
+      "/Users/davidgolzhauser/WebstormProjects/lxcommunicator"
+    ]
+  ],
+  "_from": "elliptic@6.4.1",
   "_id": "elliptic@6.4.1",
   "_inBundle": false,
   "_integrity": "sha512-BsXLz5sqX8OHcsh7CqBMztyXARmGQ3LWPtGjJi6DiJHq5C/qvi9P3OqgswKSDftbu8+IoI/QDTAm2fFnQ9SZSQ==",
   "_location": "/elliptic",
   "_phantomChildren": {},
   "_requested": {
-    "type": "range",
+    "type": "version",
     "registry": true,
-    "raw": "elliptic@^6.0.0",
+    "raw": "elliptic@6.4.1",
     "name": "elliptic",
     "escapedName": "elliptic",
-    "rawSpec": "^6.0.0",
+    "rawSpec": "6.4.1",
     "saveSpec": null,
-    "fetchSpec": "^6.0.0"
+    "fetchSpec": "6.4.1"
   },
   "_requiredBy": [
     "/browserify-sign",
     "/create-ecdh"
   ],
   "_resolved": "https://registry.npmjs.org/elliptic/-/elliptic-6.4.1.tgz",
-  "_shasum": "c2d0b7776911b86722c632c3c06c60f2f819939a",
-  "_spec": "elliptic@^6.0.0",
-  "_where": "/Users/david/Entwicklung/Loxone/LxCommunicator/node_modules/browserify-sign",
+  "_spec": "6.4.1",
+  "_where": "/Users/davidgolzhauser/WebstormProjects/lxcommunicator",
   "author": {
     "name": "Fedor Indutny",
     "email": "fedor@indutny.com"
@@ -25379,7 +25354,6 @@ module.exports={
   "bugs": {
     "url": "https://github.com/indutny/elliptic/issues"
   },
-  "bundleDependencies": false,
   "dependencies": {
     "bn.js": "^4.4.0",
     "brorand": "^1.0.1",
@@ -25389,7 +25363,6 @@ module.exports={
     "minimalistic-assert": "^1.0.0",
     "minimalistic-crypto-utils": "^1.0.0"
   },
-  "deprecated": false,
   "description": "EC cryptography",
   "devDependencies": {
     "brfs": "^1.4.3",
@@ -46402,6 +46375,12 @@ module.exports = _dereq_('../package.json').version;
 
 },{"../package.json":260}],260:[function(_dereq_,module,exports){
 module.exports={
+  "_args": [
+    [
+      "websocket@1.0.28",
+      "/Users/davidgolzhauser/WebstormProjects/lxcommunicator"
+    ]
+  ],
   "_from": "websocket@1.0.28",
   "_id": "websocket@1.0.28",
   "_inBundle": false,
@@ -46421,13 +46400,11 @@ module.exports={
     "fetchSpec": "1.0.28"
   },
   "_requiredBy": [
-    "#USER",
     "/"
   ],
   "_resolved": "https://registry.npmjs.org/websocket/-/websocket-1.0.28.tgz",
-  "_shasum": "9e5f6fdc8a3fe01d4422647ef93abdd8d45a78d3",
-  "_spec": "websocket@1.0.28",
-  "_where": "/Users/david/Entwicklung/Loxone/LxCommunicator",
+  "_spec": "1.0.28",
+  "_where": "/Users/davidgolzhauser/WebstormProjects/lxcommunicator",
   "author": {
     "name": "Brian McKelvey",
     "email": "theturtle32@gmail.com",
@@ -46437,7 +46414,6 @@ module.exports={
   "bugs": {
     "url": "https://github.com/theturtle32/WebSocket-Node/issues"
   },
-  "bundleDependencies": false,
   "config": {
     "verbose": false
   },
@@ -46454,7 +46430,6 @@ module.exports={
     "typedarray-to-buffer": "^3.1.5",
     "yaeti": "^0.0.6"
   },
-  "deprecated": false,
   "description": "Websocket Client & Server Library implementing the WebSocket protocol as specified in RFC 6455.",
   "devDependencies": {
     "buffer-equal": "^1.0.0",
@@ -46703,7 +46678,12 @@ module.exports={
 
     //////////////////////////////////////////////////////////////////////
 
-    var CryptoAdapter = {};
+    var CryptoAdapter = {
+        HASH_ALGORITHM: {
+            SHA1: "SHA1",
+            SHA256: "SHA256"
+        }
+    };
 
     /**
      * Creates a Hmac-SHA1 hash of the provided message
@@ -46725,6 +46705,28 @@ module.exports={
 
     CryptoAdapter.SHA1 = function SHA1(message) {
         return CryptoJS.SHA1(message).toString();
+    };
+
+    /**
+     * Creates a Hmac-SHA1 hash of the provided message
+     * @param {string} message text which should be hashed
+     * @param {'utf8'|'hex'} messageEncoding encoding of the message
+     * @param key which is used to create the hash
+     * @param {'utf8'|'hex'} keyEncoding encoding of the key
+     * @param {'utf8'|'hex'} hashEncoding encoding of he result
+     * @returns {string|*} resulting hash
+     */
+    CryptoAdapter.HmacSHA256 = function HmacSHA256(message, messageEncoding, key, keyEncoding, hashEncoding) {
+        var msg = getEncoding(messageEncoding).parse(message);
+        var k = getEncoding(keyEncoding).parse(key);
+        var hash = CryptoJS.HmacSHA256(msg, k);
+
+        return hash.toString(getEncoding(hashEncoding || 'utf8'));
+    };
+
+
+    CryptoAdapter.SHA256 = function SHA256(message) {
+        return CryptoJS.SHA256(message).toString();
     };
 
 
@@ -50909,8 +50911,8 @@ module.exports={
         ENCRYPTED_CONNECTION_HTTP_USER: "8.1.10.4",
         TOKEN_REFRESH_AND_CHECK: "10.0.9.13",       // Tokens may now change when being refreshed. New webservice for checking token validity without changing them introduced
         SECURE_HTTP_REQUESTS: "7.1.9.17",
-        JWT_SUPPORT: "10.1.12.5"                    // From this version onwards, JWTs are handled using separate commands to ensure regular apps remain unchanged.
-
+        JWT_SUPPORT: "10.1.12.5",                   // From this version onwards, JWTs are handled using separate commands to ensure regular apps remain unchanged.
+        SHA_256: "10.4.0.0"
     };
 
     FeatureCheck.setCurrentVersion = function setCurrentVersion(current) {
@@ -51334,9 +51336,7 @@ module.exports={
         var self = this;
 
         // clean up host:
-        if (host.indexOf("http://") === 0) { // we can't use our hasPrefix/hasSuffix helpers because of webworkers!
-            host = host.replace("http://", "");
-        }
+        host = host.replace(/^http[s]?:\/\//, ""); // Remove the HTTP protocols as we use the Websocket protocol here...
         if (host.indexOf("/", (host.length - "/".length)) !== -1) {
             host = host.substring(0, host.length -1); // remove padding / -> is added below again!
         }

@@ -7,7 +7,9 @@
 
     var $ = require('../vendor/JqueryWrapper'),
         CryptoJS = require('crypto-js'),
+        CryptoAdapter = require('../vendor/CryptoAdapter'),
         JSEncryptWrapper = require('node-jsencrypt'),
+        FeatureCheck = require('../vendor/FeatureCheck'),
         Commands = require('../vendor/Commands'),
         DEBUG = require('../vendor/Debug').HttpRequest;
 
@@ -84,17 +86,23 @@
             },
 
             /**
-             * Will launch an authentication request based on the username and password provided. The credetnials will be hashed
+             * Will launch an authentication request based on the username and password provided. The credentials will be hashed
              * using the otSalt provided. The request will NOT be encrypted.
+             * @note This function is only available until Loxone Config Version 9.3
              * @param url
              * @param username
              * @param password
-             * @param otSalt    the onetime salt to use for authenticating
+             * @param otSalt            the onetime salt to use for authenticating
+             * @param currentMsVersion
              * @returns {*}
              */
-            authViaPassword: function authViaPassword(url, username, password, otSalt) {
+            authViaPassword: function authViaPassword(url, username, password, otSalt, currentMsVersion) {
+                if (!FeatureCheck.check(FeatureCheck.feature.NON_TOKEN_AUTH_SUPPORTED, currentMsVersion)) {
+                    throw new Error("Miniservers running >= 9.3 only support token and basic authentication");
+                }
+
                 var authData = {
-                    auth: CryptoJS.HmacSHA1(username + ":" + password, this._hexToString(otSalt)).toString(),
+                    auth: CryptoAdapter["Hmac" + CryptoAdapter.HASH_ALGORITHM.SHA1](username + ":" + password, "utf8", otSalt, "hex", "hex"),
                     user: username
                 };
                 return this.request(url, Commands.STRUCTURE_FILE_DATE, authData);
@@ -141,11 +149,11 @@
 
                 return this._requestTokenSalts(url, username).then(function(saltObj) {
                     // create a SHA1 hash of the (salted) password
-                    pwHash = CryptoJS.SHA1(password + ":" + saltObj.salt).toString();
+                    pwHash = CryptoAdapter[saltObj.hashAlg](password + ":" + saltObj.salt).toString();
                     pwHash = pwHash.toUpperCase();
 
                     // hash with user and otSalt
-                    hash = this._otHash(username + ":" + pwHash, saltObj.oneTimeSalt);
+                    hash = this._otHash(username + ":" + pwHash, saltObj.oneTimeSalt, saltObj.hashAlg);
 
                     // build up the token command
                     cmd = this._getTokenCmd(hash, username, type, deviceUuid, deviceInfo);
@@ -163,15 +171,13 @@
              * Will create a oneTime hash of the payload using the salt provided
              * @param payload
              * @param otSalt
+             * @param hashAlg
              * @returns {string}
              * @private
              */
-            _otHash: function _otHash(payload, otSalt) {
-                var msg = CryptoJS.enc.Utf8.parse(payload);
-                var k = CryptoJS.enc.Hex.parse(otSalt);
-                var hash = CryptoJS.HmacSHA1(msg, k);
-
-                return hash.toString(CryptoJS.enc.Hex);
+            _otHash: function _otHash(payload, otSalt, hashAlg) {
+                hashAlg = hashAlg || CryptoAdapter.HASH_ALGORITHM.SHA1;
+                return CryptoAdapter["Hmac" + hashAlg](payload, "utf8", otSalt, "hex", "hex");
             },
 
             /**
@@ -199,7 +205,8 @@
                 return this.lxEncRequestValue(url, cmd).then(function(result) {
                     return {
                         oneTimeSalt: result.key,
-                        salt: result.salt
+                        salt: result.salt,
+                        hashAlg: result.hashAlg || CryptoAdapter.HASH_ALGORITHM.SHA1
                     };
                 });
             },

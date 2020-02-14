@@ -11,6 +11,10 @@
      */
     function WebSocketConfig(protocol, uniqueId, deviceInfo, requiredPermission, isDownloadSocket) {
         this._delegate = {};
+        if (Object.values(WebSocketConfig.protocol).indexOf(protocol) === -1) {
+            console.warn(this.name, "Unknown protocol '" + protocol + "' using '" + WebSocketConfig.protocol.WS + "' instead!");
+            protocol = WebSocketConfig.protocol.WS;
+        }
         this._protocol = protocol;
         this._uniqueId = uniqueId;
         this._deviceInfo = deviceInfo;

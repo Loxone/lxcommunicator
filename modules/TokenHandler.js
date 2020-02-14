@@ -40,12 +40,12 @@
 
                 return this._requestUserSalt(user).then(function(saltObj) {
 
-                    // create a SHA1 hash of the (salted) password
-                    pwHash = CryptoAdapter.SHA1(password + ":" + saltObj.salt);
+                    // create a SHA1 or SHA256 hash of the (salted) password
+                    pwHash = CryptoAdapter[saltObj.hashAlg](password + ":" + saltObj.salt);
                     pwHash = pwHash.toUpperCase();
 
                     // hash with user and otSalt
-                    hash = this._otHash(user + ":" + pwHash, saltObj.oneTimeSalt);
+                    hash = this._otHash(user + ":" + pwHash, saltObj.oneTimeSalt, saltObj.hashAlg);
 
                     // create the getToken cmd
                     cmd = Commands.format(this._getGetTokenCommand(), hash, user, msPermission, deviceId, deviceInfo);
@@ -431,20 +431,23 @@
                 return communicatorModule.send(cmd, EncryptionType.REQUEST_RESPONSE_VAL).then(function(result) {
                     return {
                         oneTimeSalt: result.LL.value.key,
-                        salt: result.LL.value.salt
+                        salt: result.LL.value.salt,
+                        hashAlg: result.LL.value.hashAlg || CryptoAdapter.HASH_ALGORITHM.SHA1
                     };
                 });
             },
 
             /**
-             * Helper method that will create a oneTimeHash (HmacSHA1) of the payload using the oneTimeSalt provided.
+             * Helper method that will create a oneTimeHash (HmacSHA1 or HmacSHA256) of the payload using the oneTimeSalt provided.
              * @param payload       the payload to hash
-             * @param oneTimeSalt   the onetime salt to use for the HmacSHA1
+             * @param oneTimeSalt   the onetime salt to use for the HmacSHA1 or HmacSHA256
+             * @param [hashAlg]     the hashing algorithm to be used
              * @returns {string|*}
              * @private
              */
-            _otHash: function _otHash(payload, oneTimeSalt) {
-                return CryptoAdapter.HmacSHA1(payload, "utf8", oneTimeSalt, "hex", "hex");
+            _otHash: function _otHash(payload, oneTimeSalt, hashAlg) {
+                hashAlg = hashAlg || CryptoAdapter.HASH_ALGORITHM.SHA1;
+                return CryptoAdapter["Hmac" + hashAlg](payload, "utf8", oneTimeSalt, "hex", "hex");
             },
 
             /**
@@ -677,7 +680,7 @@
              * @private
              */
             _getRefreshCommand: function _getRefreshCommand() {
-                return FeatureCheck.check(FeatureCheck.feature.JWT_SUPPORT)  ? Commands.TOKEN.REFRESH : Commands.TOKEN.REFRESH_JWT;
+                return FeatureCheck.check(FeatureCheck.feature.JWT_SUPPORT)  ? Commands.TOKEN.REFRESH_JWT : Commands.TOKEN.REFRESH;
             }
         }
     };

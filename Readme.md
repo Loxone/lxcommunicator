@@ -53,6 +53,30 @@ npm install lxcommunicator --save
 ## Example
 **Please take a look in the `./test` folder and run `npm test` to run `./test/index.js` in Node.js**
 
+## Establish a TLS connection (`https://` and `wss://`)
+- A TLS connection is *only* supported by the Miniserver Generation 2
+- It is mandatory to enter the URL in the following format to ensure the Certificate matches the domain.
+    - This prevents the `ERR_CERT_COMMON_NAME_INVALID` error.
+- Both a local and remote connection can be established via the URL below (IPv4 and IPv6)
+ 
+ | IP of the Miniserver                   | Serial Number of the Miniserver | Resulting URL                                            |
+ |:---------------------------------------|:--------------------------------|:---------------------------------------------------------|
+ | 89.23.45.12                            | 504f94a00001                    | https://89-23-45-12.504f94a00001.dyndns.loxonecloud.com  |
+ | 192.168.0.77                           | 504f94a00001                    | https://192-168-0-77.504f94a00001.dyndns.loxonecloud.com |
+ | [2001:db8:85a3:8d3:1319:8a2e:370:7348] | 504f94a00001                    | https://2001-db8-85a3-8d3-1319-8a2e-370-7348.504f94a00001.dyndns.loxonecloud.com |
+ 
+ **Further information on on how to establish a TLS connection to a Miniserver Generation 2 can be found [here](https://www.loxone.com/enen/kb/api/)**
+ 
+ **Common issues when using TLS (`https://` and `wss://`)**
+ - Expired Certificate
+   - Verify your expiration date
+ - Common name won't match
+   - Verify that your domain matches the common name defined in the certificate
+ - Wrong HTTPS port
+   - Verify that you port forward the Miniserver Generations 2 port `443` on your router. The external port can be defined as you wish.
+   
+> **Tip:**<br>Validate your url in the browser, it allows you to easily verify the Certificate against the URL and view the browsers error message.
+
 ## Create Browser module
 - Execute the `browserify.js` script, it will create the browser modules
 ````
@@ -61,4 +85,4 @@ node ./browserify.js
 
 ## Set Debug flags
 Go to `./vendor/Debug.js` and adopt the flags to your needs.<br>
-> **Note:**<br>Don't forget to execute the browserify script everytime you make a change in this module!
+> **Note:**<br>Don't forget to execute the browserify script every time you make a change in this module!

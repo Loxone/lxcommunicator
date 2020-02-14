@@ -41,9 +41,7 @@
         var self = this;
 
         // clean up host:
-        if (host.indexOf("http://") === 0) { // we can't use our hasPrefix/hasSuffix helpers because of webworkers!
-            host = host.replace("http://", "");
-        }
+        host = host.replace(/^http[s]?:\/\//, ""); // Remove the HTTP protocols as we use the Websocket protocol here...
         if (host.indexOf("/", (host.length - "/".length)) !== -1) {
             host = host.substring(0, host.length -1); // remove padding / -> is added below again!
         }
