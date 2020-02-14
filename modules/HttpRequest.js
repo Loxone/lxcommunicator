@@ -88,6 +88,7 @@
             /**
              * Will launch an authentication request based on the username and password provided. The credentials will be hashed
              * using the otSalt provided. The request will NOT be encrypted.
+             * @note This function is only available until Loxone Config Version 9.3
              * @param url
              * @param username
              * @param password
@@ -96,9 +97,12 @@
              * @returns {*}
              */
             authViaPassword: function authViaPassword(url, username, password, otSalt, currentMsVersion) {
-                var hashAlg = FeatureCheck.check(FeatureCheck.feature.SHA_256, currentMsVersion) ? CryptoAdapter.HASH_ALGORITHM.SHA256 : CryptoAdapter.HASH_ALGORITHM.SHA1,
-                    authData = {
-                    auth: CryptoAdapter["Hmac" + hashAlg](username + ":" + password, "utf8", otSalt, "hex", "hex"),
+                if (!FeatureCheck.check(FeatureCheck.feature.NON_TOKEN_AUTH_SUPPORTED, currentMsVersion)) {
+                    throw new Error("Miniservers running >= 9.3 only support token and basic authentication");
+                }
+
+                var authData = {
+                    auth: CryptoAdapter["Hmac" + CryptoAdapter.HASH_ALGORITHM.SHA1](username + ":" + password, "utf8", otSalt, "hex", "hex"),
                     user: username
                 };
                 return this.request(url, Commands.STRUCTURE_FILE_DATE, authData);
