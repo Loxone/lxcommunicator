@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.1.0]
 ## New
 - Support for SHA256 based hashes when communicating with the Minserver
-- Support for Miniserver v2 using SSL (HTTPS/WSS)
+- Support for Miniserver Generation 2 using TLS (HTTPS/WSS)
 
 ## [1.0.1] - 2019-07-23
 ### Fixed
