@@ -1,0 +1,17 @@
+{
+	"folders": [
+		{
+			"name": "node_modules",
+			"path": "../../../.Trash/node_modules"
+		},
+		{
+			"name": "GithubActionTest-Praktikum",
+			"path": ".."
+		},
+		{
+			"name": "node_modules",
+			"path": "../node_modules"
+		}
+	],
+	"settings": {}
+}
