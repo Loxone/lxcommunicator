@@ -3,7 +3,7 @@ name: Action Test
 on:
   push:
     branches: 
-      - '*'
+      - testsMocha
 
 jobs:
   build:
