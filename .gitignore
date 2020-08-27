@@ -71,3 +71,4 @@ typings/
 gen
 /LxCommunicator~Browser.js
 /LxCommunicator~Browser.min.js
+node_modules
