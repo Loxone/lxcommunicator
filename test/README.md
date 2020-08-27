@@ -14,5 +14,5 @@ describe #test --> test if: <br><br>
 <br><br>
 <b>How to run test</b><br><br>
 type: <br>
-"mocha" <br><br>
+"mocha" <br>
 
