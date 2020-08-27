@@ -42,7 +42,7 @@ function getUUID() {
 var socket = new LxCommunicator.WebSocket(config);
 
 
-//export code to test
+//Export code to test
 module.exports = { 
   doTest: function doTest() {
     var scene = 1
