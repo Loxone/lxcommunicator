@@ -3,13 +3,13 @@
   "version": "1.0.0",
   "description": "Mocha test",
   "dependencies": {
-    "@actions/core": "^1.2.4",
-    "@actions/github": "^4.0.0",
+    
     "q": "^1.5.1"
   },
   "devDependencies": {
+    "@actions/core": "^1.2.4",
+    "@actions/github": "^4.0.0",
     "chai": "^4.2.0",
-    "lxcommunicator": "^1.1.1",
     "mocha": "^8.1.1"
   },
   "scripts": {
