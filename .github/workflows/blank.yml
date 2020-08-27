@@ -27,5 +27,6 @@ jobs:
     
     - name: run test
       run: |
-        mocha --timeout 10000 --exit
+        npm test
+        
 
