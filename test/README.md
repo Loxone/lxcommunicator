@@ -5,9 +5,9 @@ The aim of this project is to automatically run mocha-tests with every push on g
 ## About Mocha
 Mocha is a Javascript test framework that is used to easily run asynchronous tests on Node.js or in the browser.
 
-## This Project
+## Test example
 
-Two files are used for the tests. `lightTest.js` and `conditions.js`.
+In this project, two files are used for the tests. `lightTest.js` and `conditions.js`.
 `lightTest.js` contains the code of what should be tested. The result is returned and is exported with `module.exports`. So `lightTest.js` has to be required in `condition.js`.
 
 Example:<br>
