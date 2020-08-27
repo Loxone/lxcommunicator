@@ -1,9 +1,9 @@
 const { SSL_OP_EPHEMERAL_RSA } = require('constants');
 const { notEqual, doesNotMatch } = require('assert');
-const { iterate } = require('when');
+//const { iterate } = require('when');
 const { domainToUnicode } = require('url');
 
-var LxCommunicator = require('lxcommunicator');
+var LxCommunicator = require('../LxCommunicator.js');
 
 var uuid = getUUID(),
     delegateObj = {
