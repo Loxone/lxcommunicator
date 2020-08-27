@@ -27,6 +27,6 @@ jobs:
     
     - name: run test
       run: |
-        mocha
+        mocha --timeout 10000 --exit
 
 
