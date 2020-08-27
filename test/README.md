@@ -7,11 +7,11 @@ Mocha is a Javascript test framework that is used to easily run asynchronous tes
 
 ## Test example
 
-In this project, two files are used for the tests. `lightTest.js` and `conditions.js`.
-`lightTest.js` contains the code of what should be tested. The result is returned and is exported with `module.exports`. So `lightTest.js` has to be required in `condition.js`.
+In this example, two files are used for the tests. `doSomething.js` and `expectations.js`.
+`doSomething.js` contains the code of what should be tested. The result is returned and is exported with `module.exports`. So `doSomething.js` has to be required in `expectations.js`.
 
 Example:<br>
-lightTest.js
+doSomething.js
 
 ```ruby
 module.exports = function () { 
@@ -21,13 +21,13 @@ module.exports = function () {
 }
 ```
 
-`true` is returned. The result is evaluated in `conditions.js`.
+`true` is returned. The result is evaluated in `expectations.js`.
 
 Example: <br>
-condition.js
+expectations.js
 
 ```ruby
-var lightTest = require(./lightTest.js);
+var lightTest = require(./doSomething.js);
 var chai = require('chai');
 
 describe('#result', function() {
@@ -39,5 +39,29 @@ describe('#result', function() {
 });
 ```
 
-To use expect, you have to require the chai library in condition.js
+To use expect, you have to require the chai library in `expectations.js`.
 More information about [chai](https://www.chaijs.com/).
+
+## This project
+In this `test`-project a command is sent to the testminiserver in `lightTest.js` and `respons.LL`is returned. 
+Then `respons.LL` is evaluated in `conditions.js`.
+
+It is tested if:
+* socket is opened
+* code is right (200)
+* sockend send was successful (value = 1)
+
+Mocha will return if each expectation is wheter fulfilled or failed.
+
+These test-files are combined with an action file: `actionTest.yml`. 
+In this file, npm is installed automatically and the tests are executed on push to github.
+
+## How to run test
+To run the tests locally, type:
+``` 
+mocha
+```
+To end the process immediately after all tests, type:
+````
+mocha --exit
+```
