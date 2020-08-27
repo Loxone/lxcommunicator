@@ -35,7 +35,8 @@
     "sprintf-js": "^1.1.1",
     "uglify-js": "^3.4.9",
     "websocket": "^1.0.28",
-    "when": "^3.7.8"
+    "when": "^3.7.8",
+    "mocha": "^8.1.2"
   },
   "devDependencies": {
     "@actions/core": "^1.2.5",
