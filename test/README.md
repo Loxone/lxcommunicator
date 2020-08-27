@@ -39,7 +39,7 @@ describe('#result', function() {
 });
 ```
 
-To use expect, you have to require the chai library in `expectations.js`.
+To use expect, you have to require the chai library in `expectations.js`. <br>
 More information about [chai](https://www.chaijs.com/).
 
 ## This project
@@ -49,12 +49,12 @@ Then `respons.LL` is evaluated in `conditions.js`.
 It is tested if:
 * socket is opened
 * code is right (200)
-* sockend send was successful (value = 1)
+* socket send was successful (value = 1)
 
 Mocha will return if each expectation is wheter fulfilled or failed.
 
 These test-files are combined with an action file: `actionTest.yml`. 
-In this file, npm is installed automatically and the tests are executed on push to github.
+In this file, npm is installed automatically and the tests are executed on every push to github.
 
 ## How to run test
 To run the tests locally, type:
@@ -62,6 +62,6 @@ To run the tests locally, type:
 mocha
 ```
 To end the process immediately after all tests, type:
-````
+```
 mocha --exit
 ```
