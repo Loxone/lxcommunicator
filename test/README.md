@@ -61,7 +61,7 @@ To run the tests locally, type:
 ``` 
 mocha
 ```
-To end the process immediately after all tests, type:
+To end the process immediately after all tests, add `--exit`:
 ```
 mocha --exit
 ```
