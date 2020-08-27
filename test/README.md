@@ -53,7 +53,7 @@ It is tested if:
 
 Mocha will return if each expectation is wheter fulfilled or failed.
 
-These test-files are combined with an action file: `actionTest.yml`. 
+These test-files are combined with an action file: `.github/workflows/actionTest.yml`. 
 In this file, npm is installed automatically and the tests are executed on every push to github.
 
 ## How to run test
