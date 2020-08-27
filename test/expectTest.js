@@ -1,7 +1,7 @@
   var lightTest = require('./lightTest.js');
   var chai = require('chai');
   var res = require('./lightTest.js').doTest
-  var LxCommunicator = require('lxcommunicator');
+  var LxCommunicator = require('./LxCommunicator.js');
 
   const { SSL_OP_EPHEMERAL_RSA } = require('constants');
   const { notEqual, doesNotMatch } = require('assert');
