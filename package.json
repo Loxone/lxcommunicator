@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "Mocha test",
   "dependencies": {
+    "crypto-js": "^3.1.9-1",
     "when": "^3.7.8",
     "q": "^1.5.1"
   },
