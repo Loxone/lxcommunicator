@@ -3,7 +3,6 @@
   "version": "1.0.0",
   "description": "Mocha test",
   "dependencies": {
-    
     "q": "^1.5.1"
   },
   "devDependencies": {
