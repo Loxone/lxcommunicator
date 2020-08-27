@@ -9,8 +9,8 @@ Mocha is a Javascript test framework that is used to easily run asynchronous tes
 
 Two files are used for the tests. `lightTest.js` and `conditions.js`.
 `lightTest.js` contains the code of what should be tested. The result is returned and is exported with `module.exports`. So `lightTest.js` has to be required in `condition.js`.<br>
-Example: <br>
 
+Example:
 lightTest.js
 
 ```ruby
@@ -22,8 +22,8 @@ module.exports = function () {
 ```
 
 `true` is returned. The result is evaluated in `conditions.js`. <br>
-Example: <br>
 
+Example: 
 condition.js
 
 ```ruby
