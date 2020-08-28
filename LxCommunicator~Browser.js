@@ -32027,30 +32027,35 @@ utils.intFromLE = intFromLE;
 arguments[4][21][0].apply(exports,arguments)
 },{"buffer":49,"dup":21}],167:[function(_dereq_,module,exports){
 module.exports={
-  "_from": "elliptic@^6.5.3",
+  "_args": [
+    [
+      "elliptic@6.5.3",
+      "/Users/koeckni/lxcommunicator"
+    ]
+  ],
+  "_from": "elliptic@6.5.3",
   "_id": "elliptic@6.5.3",
   "_inBundle": false,
   "_integrity": "sha512-IMqzv5wNQf+E6aHeIqATs0tOLeOTwj1QKbRcS3jBbYkl5oLAserA8yJTT7/VyHUYG91PRmPyeQDObKLPpeS4dw==",
   "_location": "/elliptic",
   "_phantomChildren": {},
   "_requested": {
-    "type": "range",
+    "type": "version",
     "registry": true,
-    "raw": "elliptic@^6.5.3",
+    "raw": "elliptic@6.5.3",
     "name": "elliptic",
     "escapedName": "elliptic",
-    "rawSpec": "^6.5.3",
+    "rawSpec": "6.5.3",
     "saveSpec": null,
-    "fetchSpec": "^6.5.3"
+    "fetchSpec": "6.5.3"
   },
   "_requiredBy": [
     "/browserify-sign",
     "/create-ecdh"
   ],
   "_resolved": "https://registry.npmjs.org/elliptic/-/elliptic-6.5.3.tgz",
-  "_shasum": "cb59eb2efdaf73a0bd78ccd7015a62ad6e0f93d6",
-  "_spec": "elliptic@^6.5.3",
-  "_where": "/Users/koeckni/lxcommunicator/node_modules/browserify-sign",
+  "_spec": "6.5.3",
+  "_where": "/Users/koeckni/lxcommunicator",
   "author": {
     "name": "Fedor Indutny",
     "email": "fedor@indutny.com"
@@ -32058,7 +32063,6 @@ module.exports={
   "bugs": {
     "url": "https://github.com/indutny/elliptic/issues"
   },
-  "bundleDependencies": false,
   "dependencies": {
     "bn.js": "^4.4.0",
     "brorand": "^1.0.1",
@@ -32068,7 +32072,6 @@ module.exports={
     "minimalistic-assert": "^1.0.0",
     "minimalistic-crypto-utils": "^1.0.0"
   },
-  "deprecated": false,
   "description": "EC cryptography",
   "devDependencies": {
     "brfs": "^1.4.3",
@@ -53352,28 +53355,33 @@ module.exports = _dereq_('../package.json').version;
 
 },{"../package.json":287}],287:[function(_dereq_,module,exports){
 module.exports={
-  "_from": "websocket@^1.0.28",
+  "_args": [
+    [
+      "websocket@1.0.31",
+      "/Users/koeckni/lxcommunicator"
+    ]
+  ],
+  "_from": "websocket@1.0.31",
   "_id": "websocket@1.0.31",
   "_inBundle": false,
   "_integrity": "sha512-VAouplvGKPiKFDTeCCO65vYHsyay8DqoBSlzIO3fayrfOgU94lQN5a1uWVnFrMLceTJw/+fQXR5PGbUVRaHshQ==",
   "_location": "/websocket",
   "_phantomChildren": {},
   "_requested": {
-    "type": "range",
+    "type": "version",
     "registry": true,
-    "raw": "websocket@^1.0.28",
+    "raw": "websocket@1.0.31",
     "name": "websocket",
     "escapedName": "websocket",
-    "rawSpec": "^1.0.28",
+    "rawSpec": "1.0.31",
     "saveSpec": null,
-    "fetchSpec": "^1.0.28"
+    "fetchSpec": "1.0.31"
   },
   "_requiredBy": [
     "/"
   ],
   "_resolved": "https://registry.npmjs.org/websocket/-/websocket-1.0.31.tgz",
-  "_shasum": "e5d0f16c3340ed87670e489ecae6144c79358730",
-  "_spec": "websocket@^1.0.28",
+  "_spec": "1.0.31",
   "_where": "/Users/koeckni/lxcommunicator",
   "author": {
     "name": "Brian McKelvey",
@@ -53384,7 +53392,6 @@ module.exports={
   "bugs": {
     "url": "https://github.com/theturtle32/WebSocket-Node/issues"
   },
-  "bundleDependencies": false,
   "config": {
     "verbose": false
   },
@@ -53402,7 +53409,6 @@ module.exports={
     "typedarray-to-buffer": "^3.1.5",
     "yaeti": "^0.0.6"
   },
-  "deprecated": false,
   "description": "Websocket Client & Server Library implementing the WebSocket protocol as specified in RFC 6455.",
   "devDependencies": {
     "buffer-equal": "^1.0.0",
