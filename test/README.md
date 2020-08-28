@@ -38,7 +38,7 @@ describe('#result', function() {
   });
 });
 ```
-Mocha returns either fulfilled or failed for each expectation.
+Mocha returns either fulfilled or failed for each expectation. <br>
 To use expect, you have to require the chai library in `expectations.js`. <br>
 More information about [chai](https://www.chaijs.com/).
 
