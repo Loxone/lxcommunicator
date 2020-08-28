@@ -38,7 +38,7 @@ describe('#result', function() {
   });
 });
 ```
-
+Mocha returns either fulfilled or failed for each expectation.
 To use expect, you have to require the chai library in `expectations.js`. <br>
 More information about [chai](https://www.chaijs.com/).
 
@@ -51,7 +51,7 @@ It is tested if:
 * code is right (200)
 * socket send was successful (value = 1)
 
-Moch returns either fulfilled or failed for each expectation.
+Mocha returns either fulfilled or failed for each expectation.
 
 These test-files are combined with an action file: `.github/workflows/actionTest.yml`. 
 In this file, npm is installed automatically and the tests are executed on every push to github.
