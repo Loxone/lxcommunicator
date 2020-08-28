@@ -4,6 +4,10 @@ The aim of this project is to automatically run mocha-tests with every push on g
 
 ## About Mocha
 Mocha is a Javascript test framework that is used to easily run asynchronous tests on Node.js or in the browser.
+Bevore using mocha it has to be installed.
+```
+npm install mocha
+```
 
 ## Test example
 
