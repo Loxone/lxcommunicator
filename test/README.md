@@ -27,7 +27,7 @@ module.exports = function () {
 
 `true` is returned. The result is evaluated in `expectations.js`.
 
-Example: <br>
+Example:<br>
 expectations.js
 
 ```ruby
