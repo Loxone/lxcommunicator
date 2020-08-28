@@ -51,7 +51,7 @@ It is tested if:
 * code is right (200)
 * socket send was successful (value = 1)
 
-Mocha will return if each expectation is wheter fulfilled or failed.
+Moch returns either fulfilled or failed for each expectation.
 
 These test-files are combined with an action file: `.github/workflows/actionTest.yml`. 
 In this file, npm is installed automatically and the tests are executed on every push to github.
