@@ -27,7 +27,7 @@ Example: <br>
 expectations.js
 
 ```ruby
-var lightTest = require(./doSomething.js);
+var result = require(./doSomething.js);
 var chai = require('chai');
 
 describe('#result', function() {
