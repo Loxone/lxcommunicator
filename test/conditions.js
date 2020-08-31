@@ -8,7 +8,11 @@
   const { iterate } = require('when');
   const { domainToUnicode } = require('url');
   const { assert } = require('console');
+const { expect } = require('chai');
+const { exit } = require('process');
  
+  // prepare variables
+
   var uuid = getUUID(),
       delegateObj = {
           socketOnDataProgress: function socketOnDataProgress(socket, progress) {
@@ -50,21 +54,13 @@
 
 // Tests
   describe('#test', function () { 
-    context('socket connection', function () {
-      it('socket opened', async function () {
-        await lightTest.doTest(socket).then(async function socketOpen(socket) {
-          if (socket.readyState != socket.OPEN) {
-            return false;
-          }
-          if (socket.readyState === socket.OPEN) {
-            return true;
-          }
-          
-        await chai.assert.isTrue(socketOpen(socket), "socket is opened");
-        await chai.assert.isFalse(socketOpen(socket), "socken open failed");
-        });
+    context('socket:', function() {
+      it('socket is opened', async function() {
+        await socket.open("testminiserver.loxone.com:7777", "app", "LoxLIVEpasswordTest"), async function (e) {
+          console.error("socket open failed");
+        }
+      })
     })
-
     context('code:', function(done) {
       it('right code (200)', async function() {
         await lightTest.doTest(socket).then(async function(res) {
@@ -72,21 +68,17 @@
           await chai.expect(res.Code).to.equal('200');
         });
       });
-      it('throw error if code is not 200', async function () {
-        await lightTest.doTest(socket).then(async function(res) {
-          await chai.assert.isTrue(res.Code == 200,"Error");
-          await(done);
-        }).catch(done);
-      });
     });
     context('value:', function() {
-      it('socket send succesfull', async function() {
+      it('socket send succesfull (value = 1)', async function() {
         await lightTest.doTest(socket).then(async function(res) { 
           await console.log("value: " + res.value);
           await chai.expect(res.value).to.equal('1');
         });
       });
     })
-  }); 
-});
+  }) 
+
+
+  
 
