@@ -8,8 +8,8 @@
   const { iterate } = require('when');
   const { domainToUnicode } = require('url');
   const { assert } = require('console');
-const { expect, AssertionError } = require('chai');
-const { exit } = require('process');
+  const { expect, AssertionError } = require('chai');
+  const { exit } = require('process');
  
   // prepare variables
 
@@ -52,35 +52,31 @@ const { exit } = require('process');
 
 
 
+
 // Tests
   describe('#test', function () { 
-    context('socket:', function() {
+    context('socket:', function() {   //context: name of test (socket-test)
       it('socket is opened', async function() {
-        await socket.open("testminiserver.loxone.com:7777", "app", "LoxLIVEpasswordTest"), function (e, done) {
-          throw console.error("socket open failed: check if hostname, username and password are correct");
-        }
+        await socket.open("testminiserver.loxone.com:7777", "app", "LoxLIVEpasswordTest")   // open websocket (testminiserver)
+        }, function (e) {
+          throw console.error("socket open failed")
+        })
       })
     })
 
-    context('value:', function() {
-      it('socket send succesfull (value  1)', async function() {
+    context('value:', function() {    // value-test
+      it('socket send succesful (value  1)', async function() { // check if socket send was succesful (value 1); value 0 if failed
         await lightTest.doTest(socket).then(async function(res) { 
           await console.log("value: " + res.value);
           await chai.expect(res.value).to.equal('1');
         });
       });
     })
-    context('code:', function() {
-      it('right code (200)', async function() {
+    context('code:', function() {    // code-test
+      it('right code (200)', async function() {     // check if code is 200
         await lightTest.doTest(socket).then(async function(res) {
           await console.log("code: " + res.Code);
           await chai.expect(res.Code).to.equal('200')
         });
       });
     });
-    
-  })
-
-
-
-//mocha --timeout 10000 --exit
