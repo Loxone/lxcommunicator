@@ -8,7 +8,7 @@
   const { iterate } = require('when');
   const { domainToUnicode } = require('url');
   const { assert } = require('console');
-const { expect } = require('chai');
+const { expect, AssertionError } = require('chai');
 const { exit } = require('process');
  
   // prepare variables
@@ -56,29 +56,30 @@ const { exit } = require('process');
   describe('#test', function () { 
     context('socket:', function() {
       it('socket is opened', async function() {
-        await socket.open("testminiserver.loxone.com:7777", "app", "LoxLIVEpasswordTest"), async function (e) {
-          console.error("socket open failed");
+        await socket.open("testminiserver.loxone.com:7777", "app", "LoxLIVEpasswordTest"), function (e, done) {
+          throw console.error("socket open failed: check if hostname, username and password are correct");
         }
       })
     })
-    context('code:', function(done) {
+    context('code:', function() {
       it('right code (200)', async function() {
         await lightTest.doTest(socket).then(async function(res) {
           await console.log("code: " + res.Code);
-          await chai.expect(res.Code).to.equal('200');
+          await chai.expect(res.Code).to.equal('200')
         });
       });
     });
     context('value:', function() {
-      it('socket send succesfull (value = 1)', async function() {
+      it('socket send succesfull (value  1)', async function() {
         await lightTest.doTest(socket).then(async function(res) { 
           await console.log("value: " + res.value);
+          console.log(res.value)
           await chai.expect(res.value).to.equal('1');
         });
       });
     })
-  }) 
+  })
 
 
-  
 
+//mocha --timeout 10000 --exit
