@@ -9,7 +9,7 @@ module.exports = {
     3 = kochen
     4 = Test
     */
-    var scene = 4
+    var scene = 2
 
       // send command to miniserver
       // uuid: Beleuchtung Abstellraum
