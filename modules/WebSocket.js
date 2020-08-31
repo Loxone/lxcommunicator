@@ -119,7 +119,7 @@
                 this._ws = new WebSocketWrapper(resHost, this._config.protocol);
             }
 
-            this._ws.onOpen = this.wsOpened.bind(this, resHost, user, password, encryptionAllowed, supportsTokens, authToken);
+           // this._ws.onOpen = this.wsOpened.bind(this, resHost, user, password, encryptionAllowed, supportsTokens, authToken);
             this._ws.onMessageError = this._messageErrorHandler.bind(this);
             this._ws.onTextMessage = this._textMessageHandler.bind(this);
             this._ws.onBinaryMessage = this._binaryMessageHandler.bind(this);
