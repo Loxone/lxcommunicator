@@ -227,7 +227,7 @@
             cmd = Commands.format(Commands.AUTHENTICATE, hash);
         }
 
-        this.send(cmd, EncryptionType.NONE).then(this._handleSuccessFullAuth, this._handleBadAuthResponse);
+        this.send(cmd, EncryptionType.NONE).then(this._handleSuccessFullAuth.bind(this), this._handleBadAuthResponse.bind(this));
     };
 
     WebSocket.prototype._handleSuccessFullAuth = function _handleSuccessFullAuth() {
@@ -307,7 +307,7 @@
             } else {
                 throw new Error("Could not acquire token!");
             }
-        }.bind(this), this._handleBadAuthResponse);
+        }.bind(this), this._handleBadAuthResponse.bind(this));
     };
 
     /**
