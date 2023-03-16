@@ -329,6 +329,10 @@
      * @param [tokenBasedAuth]    optional, if true an invalid token was used for authentication
      */
     WebSocket.prototype._handleBadAuthResponse = function _handleBadAuthResponse(result, tokenBasedAuth) {
+        if (!this) {
+            // If timeout fires 'this' can be null here
+            return;
+        }
         Debug.Socket.Basic && console.log(this.name + "authenticate using " + (tokenBasedAuth ? "token" : "credentials")
             + " failed! " + JSON.stringify(result));
 
