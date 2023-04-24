@@ -24,7 +24,7 @@
     "url": "https://www.github.com/Loxone/LxCommunicator.git"
   },
   "dependencies": {
-    "axios": "^0.18.1",
+    "axios": "^0.21.2",
     "browserify": "^16.2.3",
     "crypto-js": "^3.1.9-1",
     "derequire": "^2.0.6",
