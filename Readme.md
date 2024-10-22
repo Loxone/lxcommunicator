@@ -1,3 +1,10 @@
+# Deprecation Notice ⚠️
+
+This project is no longer maintained and is not up to date with the latest additions to our API, including security improvements. 
+For future projects, please refer to the official [API Documentation](https://www.loxone.com/wp-content/uploads/datasheets/CommunicatingWithMiniserver.pdf) for the latest guidelines and updates.
+This repository will be archived and made read-only by the end of November 2024.
+
+
 # LxCommunicator v1.0.1
 This module exposes all necessary modules to establish a secure and encrypted connection to a Loxone Miniserver.
 <br>
